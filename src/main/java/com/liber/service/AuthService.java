@@ -23,6 +23,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -117,6 +119,14 @@ public class AuthService {
     @Transactional
     public void logout(String refreshToken, String principalEmail) {
         refreshTokenService.revogarSeDoUsuario(refreshToken, principalEmail);
+        // Bumpa passwordChangedAt para invalidar access tokens existentes deste usuario
+        // imediatamente — sem isso, o access vivia ate exp (~15min) apos "Sair",
+        // dando janela ofensiva pra sessao roubada. Filtro JWT rejeita tokens com
+        // iat < passwordChangedAt. Mesmo padrao de alterarStatus(false)/alterarSenha.
+        usuarioRepository.findByEmail(principalEmail).ifPresent(u -> {
+            u.setPasswordChangedAt(Instant.now());
+            usuarioRepository.save(u);
+        });
         auditService.registrar(EventoAuditoria.LOGOUT, principalEmail, "Refresh token revogado");
     }
 

@@ -2,12 +2,15 @@
 # docker-compose.prod.yml — overlay para producao
 # =============================================================================
 # Aplica em cima do docker-compose.yml com:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file .env.prod up -d
 #
-# Diferenca principal: Postgres NAO publica a porta 5432 no host — fica apenas
-# na rede interna `liber-net`. Backend acessa via DNS interno `postgres:5432`.
-# Em LAN aberta (escola), publicar 5432 no host expoe o banco a qualquer
-# cliente da rede; o overlay fecha esse vetor sem mexer no fluxo de dev local.
+# Diferencas para o compose base:
+#   1. Postgres NAO publica porta no host (so rede interna `liber-net`).
+#   2. App e frontend NAO publicam portas no host — so Caddy (80/443) e exposto.
+#   3. Caddy faz TLS automatico (Let's Encrypt) na frente do frontend.
+#   4. Servico `backup` faz pg_dump diario com rotacao 30d.
+#   5. Em prod, as imagens vem do GHCR (push pelo CI) em vez de build local.
 # =============================================================================
 
 services:
@@ -15,3 +18,91 @@ services:
     # `ports: []` REMOVE a publicacao do compose principal — sobrescreve a
     # entrada original com lista vazia em vez de adicionar.
     ports: []
+
+  app:
+    # Em prod, usa imagem publicada pelo CI no GHCR (mais rapido que rebuild
+    # local na VM Oracle, e garante que o que rodou no CI e o que vai pra prod).
+    # O CI deve fazer push como `ghcr.io/<usuario>/liber-app:latest` e :sha.
+    image: ${APP_IMAGE:-ghcr.io/CHANGE-ME/liber-app:latest}
+    # Remove build local — em prod nao buildamos na VM (CPU/RAM da VM Oracle
+    # ARM A1 e suficiente, mas build de Maven + Docker e desperdicio de IO).
+    build: !reset null
+    # Sem publicar porta — Caddy proxia /api via rede interna do compose.
+    # Frontend (nginx) tambem proxia /api -> app:8080 internamente.
+    ports: []
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/CHANGE-ME/liber-frontend:latest}
+    build: !reset null
+    # Sem publicar porta no host — Caddy chega via rede interna.
+    ports: []
+
+  # ---------------------------------------------------------------------------
+  # Caddy — reverse proxy + TLS automatico (Let's Encrypt)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: liber-caddy
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    environment:
+      # Lidas pelo Caddyfile via {$VAR}
+      DOMAIN: "${DOMAIN:?defina DOMAIN no .env.prod (ex: liber-escola.duckdns.org)}"
+      ACME_EMAIL: "${ACME_EMAIL:?defina ACME_EMAIL no .env.prod}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data         # certificados Let's Encrypt persistidos
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    mem_limit: 128m
+    cpus: 0.5
+    networks:
+      - liber-net
+
+  # ---------------------------------------------------------------------------
+  # Backup — pg_dump diario com rotacao 30d
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:16-alpine
+    container_name: liber-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-liber}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      PGPASSWORD: "${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env.prod}"
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    # Loop infinito: dump + dorme 24h. Simples e nao precisa de cron daemon.
+    # Primeiro dump roda 60s apos o boot pra esperar postgres estabilizar.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        chmod +x /backup.sh
+        sleep 60
+        while true; do
+          /backup.sh || echo "[backup] FALHA $(date)"
+          sleep 86400
+        done
+    mem_limit: 128m
+    cpus: 0.5
+    networks:
+      - liber-net
+
+volumes:
+  caddy_data:
+    name: liber-caddy-data
+  caddy_config:
+    name: liber-caddy-config
+  caddy_logs:
+    name: liber-caddy-logs

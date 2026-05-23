@@ -37,3 +37,18 @@ build/
 .env.*
 !.env.example
 !.env.prod.example
+
+### Frontend (Node/Vite) ###
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+npm-debug.log*
+
+### Backups locais (deploy) ###
+backups/*
+!backups/.gitkeep
+
+### Caddy (gerado em runtime na VM) ###
+caddy_data/
+caddy_config/
