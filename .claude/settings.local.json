@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p entity repository service controller config dto exception)",
+      "Bash(touch __TRACKED_VAR__/.gitkeep)",
+      "Bash(./mvnw -q -DskipTests compile)",
+      "Bash(./mvnw -DskipTests compile)",
+      "Bash(./mvnw -DskipTests clean compile)",
+      "Bash(./mvnw -DskipTests -Dmaven.compiler.showDeprecation=true clean compile)",
+      "Bash(./mvnw -DskipTests clean test-compile)",
+      "Bash(xargs -I {} sh -c 'unzip -l \"{}\" 2>/dev/null | grep -l TestRestTemplate.class')",
+      "Bash(./mvnw -DskipTests dependency:build-classpath -q)",
+      "Bash(xargs unzip -l)",
+      "Bash(docker version *)",
+      "Bash(./mvnw test *)",
+      "Bash(./mvnw clean *)",
+      "Bash(openssl rand *)",
+      "Bash(echo \"JWT_SECRET=$\\(openssl rand -base64 48)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(\"/c/Program Files/Docker/Docker/resources/bin/docker.exe\" version)",
+      "Bash(export PATH=\"/c/Program Files/Docker/Docker/resources/bin:$PATH\")",
+      "Bash(curl -s http://localhost:8080/actuator/health)",
+      "Bash(curl -fsS http://localhost:8080/actuator/health)"
+    ]
+  }
+}

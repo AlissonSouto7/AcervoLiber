@@ -1,0 +1,260 @@
+package com.liber.service;
+
+import com.liber.config.EmprestimoProperties;
+import com.liber.config.ReservaProperties;
+import com.liber.dto.ReservaResponse;
+import com.liber.dto.ReservaResumoResponse;
+import com.liber.entity.Aluno;
+import com.liber.entity.Emprestimo;
+import com.liber.entity.EventoAuditoria;
+import com.liber.entity.Livro;
+import com.liber.entity.Reserva;
+import com.liber.entity.SituacaoEmprestimo;
+import com.liber.entity.StatusReserva;
+import com.liber.entity.Usuario;
+import com.liber.exception.BusinessException;
+import com.liber.exception.EstoqueIndisponivelException;
+import com.liber.exception.ResourceNotFoundException;
+import com.liber.repository.AlunoRepository;
+import com.liber.repository.EmprestimoRepository;
+import com.liber.repository.LivroRepository;
+import com.liber.repository.ReservaRepository;
+import com.liber.repository.UsuarioRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Reservas de livros pelos alunos.
+ *
+ * <p>Fluxo: o aluno reserva um livro disponivel (a reserva PENDENTE segura um
+ * exemplar via decremento atomico do estoque). O bibliotecario confirma —
+ * gerando um emprestimo sem novo decremento — ou recusa. O aluno pode cancelar
+ * enquanto pendente. Reservas nao retiradas expiram pelo job de expiracao.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+@Slf4j
+public class ReservaService {
+
+    private final ReservaRepository reservaRepository;
+    private final LivroRepository livroRepository;
+    private final AlunoRepository alunoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final EmprestimoRepository emprestimoRepository;
+    private final EmprestimoService emprestimoService;
+    private final AuditService auditService;
+    private final ReservaProperties reservaProps;
+    private final EmprestimoProperties emprestimoProps;
+    private final Clock clock;
+
+    // ---------- Acoes do aluno ----------
+
+    @Transactional
+    public ReservaResponse reservar(String emailUsuario, Long livroId) {
+        Long alunoId = resolverAlunoId(emailUsuario);
+
+        // SELECT FOR UPDATE no aluno — serializa reservas concorrentes do mesmo aluno
+        Aluno aluno = alunoRepository.findByIdForUpdate(alunoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Aluno", alunoId));
+
+        if (reservaRepository.existsByAlunoIdAndLivroIdAndStatus(alunoId, livroId, StatusReserva.PENDENTE)) {
+            throw new BusinessException("Voce ja tem uma reserva pendente para este livro.");
+        }
+
+        long ativos = emprestimoRepository.countByAlunoIdAndSituacao(alunoId, SituacaoEmprestimo.ATIVO);
+        long pendentes = reservaRepository.countByAlunoIdAndStatus(alunoId, StatusReserva.PENDENTE);
+        int limite = emprestimoProps.limitePorAluno();
+        if (ativos + pendentes >= limite) {
+            throw new BusinessException(
+                "Voce atingiu o limite de %d livros entre emprestimos e reservas.".formatted(limite));
+        }
+
+        // Segura um exemplar (decremento atomico, igual ao emprestimo)
+        int atualizadas = livroRepository.decrementarEstoque(livroId);
+        if (atualizadas == 0) {
+            if (!livroRepository.existsById(livroId)) {
+                throw ResourceNotFoundException.of("Livro", livroId);
+            }
+            throw new EstoqueIndisponivelException(livroId);
+        }
+        Livro livro = livroRepository.findById(livroId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Livro", livroId));
+
+        LocalDate hoje = LocalDate.now(clock);
+        Reserva reserva = Reserva.builder()
+            .livro(livro)
+            .aluno(aluno)
+            .status(StatusReserva.PENDENTE)
+            .dataReserva(hoje)
+            .dataExpiracao(hoje.plusDays(reservaProps.validadeDias()))
+            .build();
+        Reserva salva = reservaRepository.save(reserva);
+        log.info("Reserva criada id={} livro={} aluno={}", salva.getId(), livroId, alunoId);
+        auditService.registrar(EventoAuditoria.RESERVA_CRIADA, emailUsuario,
+            "Reserva id=" + salva.getId() + ", livro id=" + livroId
+                + ", aluno matricula=" + aluno.getMatricula()
+                + ", validade ate " + salva.getDataExpiracao());
+        return ReservaResponse.from(salva);
+    }
+
+    public Page<ReservaResponse> listarMinhas(String emailUsuario, Pageable pageable) {
+        Long alunoId = resolverAlunoId(emailUsuario);
+        return reservaRepository.findByAlunoIdOrderByDataReservaDesc(alunoId, pageable)
+            .map(ReservaResponse::from);
+    }
+
+    /** Resumo de emprestimos/reservas do aluno e o limite — alimenta o catalogo. */
+    public ReservaResumoResponse resumoDoAluno(String emailUsuario) {
+        Long alunoId = resolverAlunoId(emailUsuario);
+        long ativos = emprestimoRepository.countByAlunoIdAndSituacao(alunoId, SituacaoEmprestimo.ATIVO);
+        long pendentes = reservaRepository.countByAlunoIdAndStatus(alunoId, StatusReserva.PENDENTE);
+        return new ReservaResumoResponse((int) ativos, (int) pendentes, emprestimoProps.limitePorAluno());
+    }
+
+    @Transactional
+    public void cancelar(String emailUsuario, Long reservaId) {
+        Long alunoId = resolverAlunoId(emailUsuario);
+        Reserva reserva = reservaRepository.findByIdAndAlunoId(reservaId, alunoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Reserva", reservaId));
+        if (reserva.getStatus() != StatusReserva.PENDENTE) {
+            throw new BusinessException("So e possivel cancelar reservas pendentes.");
+        }
+        reserva.setStatus(StatusReserva.CANCELADA);
+        reserva.setDataResolucao(Instant.now(clock));
+        reservaRepository.save(reserva);
+        devolverExemplar(reserva, "cancelamento");
+        log.info("Reserva cancelada id={}", reservaId);
+        auditService.registrar(EventoAuditoria.RESERVA_CANCELADA, emailUsuario,
+            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
+                + ", aluno matricula=" + reserva.getAluno().getMatricula());
+    }
+
+    // ---------- Acoes do bibliotecario ----------
+
+    public Page<ReservaResponse> listarPendentes(Pageable pageable) {
+        return reservaRepository.findByStatusOrderByDataReservaAsc(StatusReserva.PENDENTE, pageable)
+            .map(ReservaResponse::from);
+    }
+
+    @Transactional
+    public ReservaResponse confirmar(Long reservaId, int prazoDias) {
+        Reserva reserva = carregarPendente(reservaId);
+        // O exemplar ja foi segurado pela reserva — o emprestimo NAO decrementa de novo
+        Emprestimo emprestimo = emprestimoService.registrarParaReserva(
+            reserva.getLivro(), reserva.getAluno(), prazoDias);
+        reserva.setStatus(StatusReserva.CONFIRMADA);
+        reserva.setDataResolucao(Instant.now(clock));
+        reserva.setEmprestimo(emprestimo);
+        log.info("Reserva confirmada id={} -> emprestimo id={}", reservaId, emprestimo.getId());
+        Reserva salva = reservaRepository.save(reserva);
+        auditService.registrar(EventoAuditoria.RESERVA_CONFIRMADA,
+            emailDoAluno(reserva.getAluno()),
+            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
+                + ", aluno matricula=" + reserva.getAluno().getMatricula()
+                + ", emprestimo id=" + emprestimo.getId()
+                + ", prazo=" + prazoDias + "d");
+        return ReservaResponse.from(salva);
+    }
+
+    @Transactional
+    public ReservaResponse recusar(Long reservaId) {
+        Reserva reserva = carregarPendente(reservaId);
+        reserva.setStatus(StatusReserva.RECUSADA);
+        reserva.setDataResolucao(Instant.now(clock));
+        devolverExemplar(reserva, "recusa");
+        log.info("Reserva recusada id={}", reservaId);
+        Reserva salva = reservaRepository.save(reserva);
+        auditService.registrar(EventoAuditoria.RESERVA_RECUSADA,
+            emailDoAluno(reserva.getAluno()),
+            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
+                + ", aluno matricula=" + reserva.getAluno().getMatricula());
+        return ReservaResponse.from(salva);
+    }
+
+    // ---------- Job de expiracao ----------
+
+    @Transactional
+    public int expirarVencidas() {
+        List<Reserva> vencidas = reservaRepository
+            .findByStatusAndDataExpiracaoBefore(StatusReserva.PENDENTE, LocalDate.now(clock));
+        Instant agora = Instant.now(clock);
+        for (Reserva reserva : vencidas) {
+            reserva.setStatus(StatusReserva.EXPIRADA);
+            reserva.setDataResolucao(agora);
+            devolverExemplar(reserva, "expiracao");
+        }
+        reservaRepository.saveAll(vencidas);
+        // Auditoria por reserva (1 evento cada) — REQUIRES_NEW do AuditService isola
+        // falhas individuais. Job nao tem auth, entao ator fica null.
+        for (Reserva reserva : vencidas) {
+            auditService.registrar(EventoAuditoria.RESERVA_EXPIRADA,
+                emailDoAluno(reserva.getAluno()),
+                "Reserva id=" + reserva.getId()
+                    + ", livro id=" + reserva.getLivro().getId()
+                    + ", aluno matricula=" + reserva.getAluno().getMatricula()
+                    + ", expirou em " + reserva.getDataExpiracao());
+        }
+        return vencidas.size();
+    }
+
+    // ---------- Apoio ----------
+
+    /**
+     * Devolve ao estoque o exemplar que a reserva segurava (cancelamento, recusa
+     * ou expiracao). Se o incremento nao afetar linhas, registra um alerta — isso
+     * indica divergencia de estoque que precisa de correcao manual.
+     */
+    private void devolverExemplar(Reserva reserva, String motivo) {
+        int devolvidas = livroRepository.incrementarEstoque(reserva.getLivro().getId());
+        if (devolvidas == 0) {
+            log.warn("Estoque NAO devolvido na {} da reserva id={} (livro id={}): "
+                    + "incremento nao afetou linhas — divergencia de estoque, verificar manualmente",
+                motivo, reserva.getId(), reserva.getLivro().getId());
+        }
+    }
+
+    private Long resolverAlunoId(String emailUsuario) {
+        Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+        Aluno aluno = usuario.getAluno();
+        if (aluno == null) {
+            throw new BusinessException("Este usuario nao esta vinculado a um aluno.");
+        }
+        return aluno.getId();
+    }
+
+    /**
+     * Email do {@code Usuario} vinculado ao aluno — usado como {@code usuarioEmail} no
+     * audit log (o "sujeito" do evento). A entidade Aluno nao tem mapping reverso
+     * para Usuario; resolvemos pelo lookup via matricula (unique). Retorna {@code null}
+     * se o aluno nao tiver acesso ao portal (sem Usuario) — improvavel num fluxo de
+     * reserva real (so loga quem tem login), mas defensivo.
+     */
+    private String emailDoAluno(Aluno aluno) {
+        if (aluno == null) {
+            return null;
+        }
+        return usuarioRepository.findByAlunoMatricula(aluno.getMatricula())
+            .map(Usuario::getEmail)
+            .orElse(null);
+    }
+
+    private Reserva carregarPendente(Long id) {
+        Reserva reserva = reservaRepository.findById(id)
+            .orElseThrow(() -> ResourceNotFoundException.of("Reserva", id));
+        if (reserva.getStatus() != StatusReserva.PENDENTE) {
+            throw new BusinessException(
+                "Esta reserva nao esta mais pendente (status: " + reserva.getStatus() + ").");
+        }
+        return reserva;
+    }
+}

@@ -1,0 +1,146 @@
+# =============================================================================
+# docker-compose.yml — sobe Postgres + backend + frontend em containers
+# =============================================================================
+# Valores reais ficam em .env (gitignored). Defaults aqui sao seguros pra
+# rodar sem .env, mas use .env pra valores fortes.
+#
+# Comandos:
+#   docker compose up -d --build         # builda imagens + sobe tudo
+#   docker compose logs -f app           # acompanha logs da aplicacao
+#   docker compose down                  # para containers (preserva o banco)
+#   docker compose down -v               # para e DELETA o volume do banco
+#   docker compose --env-file .env.prod up -d   # usar config alternativa
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: liber-pg
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-liber}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+    # 127.0.0.1 (nao 0.0.0.0) faz a porta 5432 ficar apenas em loopback do host
+    # — pgAdmin/psql local funcionam, mas a LAN nao alcanca. Em prod, o overlay
+    # `docker-compose.prod.yml` zera o `ports:` para fechar tudo (so rede interna).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - liber-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-liber}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    # Limites de recursos — sem isso um runaway no Postgres come toda a RAM do
+    # host e derruba app + frontend juntos.
+    mem_limit: 512m
+    cpus: 1.0
+    networks:
+      - liber-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: liber:latest
+    container_name: liber-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Datasource — usa as mesmas credenciais do servico postgres
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-liber}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-postgres}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+
+      # Admin seedado no primeiro boot
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@liber.local}"
+      ADMIN_NOME: "${ADMIN_NOME:-Administrador}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-@Admin2026}"
+
+      # Dados de exemplo (livros/alunos/emprestimos) — apenas dev/testes
+      SEED_DADOS_EXEMPLO: "${SEED_DADOS_EXEMPLO:-false}"
+
+      # JWT — em prod, sempre via .env com chave forte (openssl rand -base64 48)
+      JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
+      JWT_ISSUER: "${JWT_ISSUER:-liber}"
+      JWT_EXPIRATION_MS: "${JWT_EXPIRATION_MS:-900000}"
+      JWT_REFRESH_EXPIRATION_MS: "${JWT_REFRESH_EXPIRATION_MS:-604800000}"
+
+      # CORS — adicionar dominios do frontend separados por virgula
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}"
+
+      # Toggles de seguranca
+      AUTH_PUBLIC_REGISTER_ENABLED: "${AUTH_PUBLIC_REGISTER_ENABLED:-false}"
+      RATE_LIMIT_LOGIN_ENABLED: "${RATE_LIMIT_LOGIN_ENABLED:-true}"
+
+      # Capas de livro — chave da Google Books API (opcional; ver .env)
+      GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
+
+      # Spring profile — dev por padrao; use 'prod' no deploy de producao
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-dev}"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    # Cap defensivo — JVM com leak nos mapas in-memory (rate-limit/lockout) ou
+    # cache de capa nao ultrapassa o limite e mata so o container, nao o host.
+    mem_limit: 1024m
+    cpus: 2.0
+    networks:
+      - liber-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Vazio => o frontend chama /api/v1 (mesma origem); o Nginx faz o proxy.
+        VITE_API_URL: "${VITE_API_URL:-}"
+    image: liber-frontend:latest
+    container_name: liber-web
+    depends_on:
+      # Espera o backend ficar saudavel — o nginx resolve o host "app" do
+      # proxy_pass no startup; se subir antes, falha com "host not found".
+      app:
+        condition: service_healthy
+    ports:
+      # Container expoe 8080 porque o nginx roda como nao-root (vide
+      # frontend/Dockerfile + nginx.conf); portas <1024 exigem root ou
+      # NET_BIND_SERVICE, hardening evita ambos.
+      - "${FRONTEND_PORT:-3000}:8080"
+    healthcheck:
+      # 127.0.0.1 (nao localhost): o nginx escuta so em IPv4
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    networks:
+      - liber-net
+
+volumes:
+  # Volume EXTERNO — gerenciado fora do ciclo de vida do compose. Assim:
+  #  - o nome do projeto compose nao "marca" o volume (sem avisos de label);
+  #  - um `docker compose down -v` acidental NAO apaga o banco da escola.
+  # Numa implantacao nova, crie o volume uma vez antes do primeiro `up`:
+  #   docker volume create liber-pg-data
+  liber-pg-data:
+    external: true
+    name: liber-pg-data
+
+networks:
+  liber-net:
+    name: liber-net
+    driver: bridge

@@ -1,0 +1,17 @@
+# =============================================================================
+# docker-compose.prod.yml — overlay para producao
+# =============================================================================
+# Aplica em cima do docker-compose.yml com:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Diferenca principal: Postgres NAO publica a porta 5432 no host — fica apenas
+# na rede interna `liber-net`. Backend acessa via DNS interno `postgres:5432`.
+# Em LAN aberta (escola), publicar 5432 no host expoe o banco a qualquer
+# cliente da rede; o overlay fecha esse vetor sem mexer no fluxo de dev local.
+# =============================================================================
+
+services:
+  postgres:
+    # `ports: []` REMOVE a publicacao do compose principal — sobrescreve a
+    # entrada original com lista vazia em vez de adicionar.
+    ports: []

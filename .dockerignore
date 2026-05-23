@@ -1,0 +1,54 @@
+# =============================================================================
+# .dockerignore — evita copiar lixo para o build context do Docker
+# =============================================================================
+
+# Build outputs
+target/
+build/
+out/
+*.jar
+*.war
+
+# Maven wrapper (usamos a imagem maven diretamente)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Git e VCS
+.git/
+.gitignore
+.gitattributes
+
+# IDEs
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+.springBeans
+.sts4-cache
+.apt_generated
+*.iml
+*.iws
+*.ipr
+
+# Docs / metadata
+HELP.md
+*.md
+README.*
+
+# Logs e dumps
+*.log
+*.dump
+*.dumpstream
+hs_err_pid*
+
+# Memoria do Claude / IA
+.claude/
+memory/
+
+# Secrets locais (NUNCA commitar)
+.env
+.env.*
+!.env.example
