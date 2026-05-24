@@ -30,28 +30,32 @@ Domínio: `<DOMAIN>.duckdns.org` (atualizado em `.env.prod`).
 Volume persistente: `liber-pg-data` (externo — sobrevive a `docker compose down -v`).
 Volumes Caddy: `liber-caddy-data` (certificados TLS), `liber-caddy-config`, `liber-caddy-logs`.
 
+OS da VM: **Oracle Linux 9** (ARM aarch64). Usuário SSH default: **`opc`** (não `ubuntu`). Comandos abaixo assumem isso — em caso de troca para Ubuntu, substituir `dnf` por `apt` e `opc` por `ubuntu`.
+
 ---
 
 ## Primeiro deploy (setup inicial da VM)
 
-Roda 1 vez na vida da VM. Substitua `<DEPLOY_PATH>` por `/home/ubuntu/liber` (ou o que preferir).
+Roda 1 vez na vida da VM. Substitua `<DEPLOY_PATH>` por `/home/opc/liber` (ou o que preferir).
 
 ```bash
-# 1. SSH na VM
-ssh ubuntu@<IP_DA_VM>
+# 1. SSH na VM (Oracle Linux 9 usa o usuario `opc`)
+ssh -i ~/.ssh/oracle_liber.key opc@<IP_DA_VM>
 
-# 2. Instalar Docker
-sudo apt update && sudo apt install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io \
-  docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker ubuntu
-# Faça logout e login novamente para o grupo `docker` valer
+# 2. Atualizar OS + instalar Docker (Oracle Linux 9 usa dnf, nao apt)
+sudo dnf update -y
+sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin git
+sudo systemctl enable --now docker
+sudo usermod -aG docker opc
+# Faca logout e login novamente para o grupo `docker` valer (ou: newgrp docker)
+
+# 2.1. Abrir firewall do OS (Oracle Linux vem com firewalld ativo bloqueando 80/443)
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --reload
+# Lembrete: tambem precisa abrir 80/443 na Security List da subnet pela console Oracle
 
 # 3. Clonar repo
 cd ~ && git clone https://github.com/<SEU-USER>/AcervoLiber.git liber
@@ -101,7 +105,7 @@ Caddy obtém o certificado TLS automaticamente na primeira request — pode leva
 **Manual** (em caso de hotfix sem CI):
 
 ```bash
-ssh ubuntu@<IP_DA_VM>
+ssh -i ~/.ssh/oracle_liber.key opc@<IP_DA_VM>
 cd ~/liber
 git pull --ff-only origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
@@ -394,5 +398,5 @@ Mitigação simples — cron na VM que faz CPU "trabalhar" 1 min a cada hora:
 - [ ] Conferir últimas 30 entradas de `audit_log` com `evento IN ('LOGIN_FALHA', 'LOGIN_BLOQUEADO', 'ACESSO_NEGADO', 'REFRESH_REUSO')` — sinais de ataque
 - [ ] `docker system df` — limpeza se ocupação > 80% (`docker image prune -af --filter "until=720h"`)
 - [ ] Verificar se renovação do certificado TLS rolou (Caddy renova sozinho a cada 60d, mas valida)
-- [ ] Aplicar updates de OS: `sudo apt update && sudo apt upgrade -y && sudo reboot` (em horário de baixo uso)
+- [ ] Aplicar updates de OS: `sudo dnf update -y && sudo reboot` (em horário de baixo uso)
 - [ ] Atualizar imagens base: novo deploy via `main` re-puxa `postgres:16-alpine`, `caddy:2-alpine`, etc.
