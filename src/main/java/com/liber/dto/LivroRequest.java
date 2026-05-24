@@ -27,5 +27,8 @@ public record LivroRequest(
 
     @NotNull
     @Min(value = 1, message = "Quantidade de exemplares deve ser ao menos 1")
-    Integer quantidadeExemplares
+    Integer quantidadeExemplares,
+
+    @Size(max = 2000, message = "Sinopse deve ter no maximo 2000 caracteres")
+    String sinopse
 ) {}

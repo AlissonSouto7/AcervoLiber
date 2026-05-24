@@ -57,12 +57,12 @@ class EmprestimoFlowIT extends AbstractIntegrationTest {
 
         // 3) Endpoint protegido sem token retorna 401
         ResponseEntity<ProblemDetail> semToken = post("/api/v1/livros",
-            new LivroRequest("X", "Y", null, 2020, 1), null, ProblemDetail.class);
+            new LivroRequest("X", "Y", null, 2020, 1, null), null, ProblemDetail.class);
         assertThat(semToken.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         // 4) Cria livro com 2 exemplares
         LivroResponse livro = expectCreated(post("/api/v1/livros",
-            new LivroRequest("Dom Casmurro", "Machado de Assis", null, 1899, 2),
+            new LivroRequest("Dom Casmurro", "Machado de Assis", null, 1899, 2, null),
             token, LivroResponse.class));
         assertThat(livro.quantidadeExemplares()).isEqualTo(2);
         assertThat(livro.quantidadeDisponivel()).isEqualTo(2);
@@ -119,7 +119,7 @@ class EmprestimoFlowIT extends AbstractIntegrationTest {
         String token = login("biblio2@test.com", "senha-segura-2");
 
         LivroResponse livro = expectCreated(post("/api/v1/livros",
-            new LivroRequest("X", "Y", null, 2020, 5),
+            new LivroRequest("X", "Y", null, 2020, 5, null),
             token, LivroResponse.class));
         AlunoResponse aluno = expectCreated(post("/api/v1/alunos",
             new AlunoRequest("2026002", "Joao", "9B"),
@@ -138,10 +138,10 @@ class EmprestimoFlowIT extends AbstractIntegrationTest {
             null, UsuarioResponse.class);
         String token = login("biblio3@test.com", "senha-segura-3");
 
-        LivroResponse l1 = expectCreated(post("/api/v1/livros", new LivroRequest("L1", "A", null, 2020, 2), token, LivroResponse.class));
-        LivroResponse l2 = expectCreated(post("/api/v1/livros", new LivroRequest("L2", "A", null, 2020, 2), token, LivroResponse.class));
-        LivroResponse l3 = expectCreated(post("/api/v1/livros", new LivroRequest("L3", "A", null, 2020, 2), token, LivroResponse.class));
-        LivroResponse l4 = expectCreated(post("/api/v1/livros", new LivroRequest("L4", "A", null, 2020, 2), token, LivroResponse.class));
+        LivroResponse l1 = expectCreated(post("/api/v1/livros", new LivroRequest("L1", "A", null, 2020, 2, null), token, LivroResponse.class));
+        LivroResponse l2 = expectCreated(post("/api/v1/livros", new LivroRequest("L2", "A", null, 2020, 2, null), token, LivroResponse.class));
+        LivroResponse l3 = expectCreated(post("/api/v1/livros", new LivroRequest("L3", "A", null, 2020, 2, null), token, LivroResponse.class));
+        LivroResponse l4 = expectCreated(post("/api/v1/livros", new LivroRequest("L4", "A", null, 2020, 2, null), token, LivroResponse.class));
         AlunoResponse aluno = expectCreated(post("/api/v1/alunos", new AlunoRequest("2026003", "Aluno", "9C"), token, AlunoResponse.class));
 
         // Limite eh 3 — quarto deve falhar

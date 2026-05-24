@@ -8,6 +8,7 @@ export interface LivroPayload {
   isbn?: string | null;
   ano?: number | null;
   quantidadeExemplares: number;
+  sinopse?: string | null;
 }
 
 export interface ListarLivrosParams {

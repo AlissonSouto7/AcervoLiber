@@ -21,6 +21,9 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
     /** Livros que tem ISBN mas ainda nao tiveram a capa resolvida — alvo do backfill. */
     List<Livro> findByIsbnIsNotNullAndCapaUrlIsNull();
 
+    /** Livros que tem ISBN mas ainda nao tem sinopse — alvo do backfill de sinopse. */
+    List<Livro> findByIsbnIsNotNullAndSinopseIsNull();
+
     @Query("""
         SELECT l FROM Livro l
         WHERE (:termo IS NULL OR :termo = ''

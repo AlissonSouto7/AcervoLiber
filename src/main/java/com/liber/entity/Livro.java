@@ -86,6 +86,15 @@ public class Livro extends AuditableEntity {
     @Column(name = "capa_manual", nullable = false)
     private boolean capaManual;
 
+    /**
+     * Sinopse do livro, mostrada ao aluno no modal "Ver detalhes". Opcional —
+     * pode ser editada pelo bibliotecario/admin no formulario OU preenchida
+     * automaticamente pelo CapaBackfillJob a partir do Google Books.
+     */
+    @Size(max = 2000)
+    @Column(length = 2000)
+    private String sinopse;
+
     @Version
     @Column(nullable = false)
     private Long version;

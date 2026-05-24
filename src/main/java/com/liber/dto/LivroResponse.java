@@ -13,6 +13,7 @@ public record LivroResponse(
     Integer quantidadeDisponivel,
     String capaUrl,
     boolean capaManual,
+    String sinopse,
     Instant createdAt,
     Instant updatedAt
 ) {
@@ -28,6 +29,7 @@ public record LivroResponse(
             livro.getQuantidadeDisponivel(),
             livro.getCapaUrl(),
             livro.isCapaManual(),
+            livro.getSinopse(),
             livro.getCreatedAt(),
             livro.getUpdatedAt()
         );

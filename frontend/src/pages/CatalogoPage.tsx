@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, App, Button, Card, Input, List, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Descriptions, Input, List, Modal, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listarLivros } from '../api/livros';
 import { reservarLivro, resumoReservas } from '../api/reservas';
 import { mensagemDeErro } from '../api/http';
 import { CapaLivro } from '../components/CapaLivro';
+import type { LivroResponse } from '../types/api';
 
 const TAMANHO_PAGINA = 12;
 
@@ -14,6 +15,7 @@ export default function CatalogoPage() {
   const queryClient = useQueryClient();
   const [termo, setTermo] = useState('');
   const [page, setPage] = useState(0);
+  const [detalhe, setDetalhe] = useState<LivroResponse | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['catalogo', termo, page],
@@ -37,6 +39,7 @@ export default function CatalogoPage() {
       queryClient.invalidateQueries({ queryKey: ['catalogo'] });
       queryClient.invalidateQueries({ queryKey: ['minhas-reservas'] });
       queryClient.invalidateQueries({ queryKey: ['resumo-reservas'] });
+      setDetalhe(null);
     },
     onError: (erro) => message.error(mensagemDeErro(erro)),
   });
@@ -99,9 +102,18 @@ export default function CatalogoPage() {
               hoverable
               size="small"
               styles={{ body: { padding: 12 } }}
-              cover={<CapaLivro titulo={livro.titulo} autor={livro.autor} capaUrl={livro.capaUrl} />}
+              cover={
+                <div onClick={() => setDetalhe(livro)} style={{ cursor: 'pointer' }}>
+                  <CapaLivro titulo={livro.titulo} autor={livro.autor} capaUrl={livro.capaUrl} />
+                </div>
+              }
             >
-              <Typography.Paragraph strong style={{ marginBottom: 2 }} ellipsis={{ rows: 2 }}>
+              <Typography.Paragraph
+                strong
+                style={{ marginBottom: 2, cursor: 'pointer' }}
+                ellipsis={{ rows: 2 }}
+                onClick={() => setDetalhe(livro)}
+              >
                 {livro.titulo}
               </Typography.Paragraph>
               <Typography.Paragraph
@@ -128,10 +140,75 @@ export default function CatalogoPage() {
                   Indisponível
                 </Tag>
               )}
+              <Button
+                type="link"
+                size="small"
+                block
+                style={{ marginTop: 4 }}
+                onClick={() => setDetalhe(livro)}
+              >
+                Ver detalhes
+              </Button>
             </Card>
           </List.Item>
         )}
       />
+
+      <Modal
+        open={!!detalhe}
+        onCancel={() => setDetalhe(null)}
+        title={detalhe?.titulo}
+        width={720}
+        footer={
+          detalhe ? (
+            detalhe.quantidadeDisponivel > 0 ? (
+              <Button
+                type="primary"
+                disabled={semVagas}
+                loading={reservar.isPending && reservar.variables === detalhe.id}
+                onClick={() => reservar.mutate(detalhe.id)}
+              >
+                Reservar
+              </Button>
+            ) : (
+              <Tag color="red">Indisponível</Tag>
+            )
+          ) : null
+        }
+      >
+        {detalhe && (
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{ width: 180, flexShrink: 0 }}>
+              <CapaLivro
+                titulo={detalhe.titulo}
+                autor={detalhe.autor}
+                capaUrl={detalhe.capaUrl}
+                altura={260}
+              />
+            </div>
+            <div style={{ flex: '1 1 320px' }}>
+              <Descriptions column={1} size="small" colon={false}>
+                <Descriptions.Item label="Autor">{detalhe.autor}</Descriptions.Item>
+                {detalhe.ano && <Descriptions.Item label="Ano">{detalhe.ano}</Descriptions.Item>}
+                {detalhe.isbn && <Descriptions.Item label="ISBN">{detalhe.isbn}</Descriptions.Item>}
+                <Descriptions.Item label="Disponíveis">
+                  {detalhe.quantidadeDisponivel} de {detalhe.quantidadeExemplares}
+                </Descriptions.Item>
+              </Descriptions>
+              <Typography.Title level={5} style={{ marginTop: 16, marginBottom: 8 }}>
+                Sinopse
+              </Typography.Title>
+              {detalhe.sinopse ? (
+                <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
+                  {detalhe.sinopse}
+                </Typography.Paragraph>
+              ) : (
+                <Typography.Text type="secondary">Sinopse ainda não disponível.</Typography.Text>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

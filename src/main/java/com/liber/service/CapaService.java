@@ -82,6 +82,21 @@ public class CapaService {
         }
     );
 
+    /**
+     * Cache separado para sinopses — mesma estrategia (string vazia = "consultado,
+     * sem sinopse"). Separado do cache de capas porque os ciclos de busca sao
+     * independentes (um livro pode ter capa mas a Google Books nao retornar
+     * description, ou vice-versa).
+     */
+    private final Map<String, String> cacheSinopse = Collections.synchronizedMap(
+        new LinkedHashMap<String, String>(256, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                return size() > CACHE_MAX_ENTRIES;
+            }
+        }
+    );
+
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(4))
         .followRedirects(HttpClient.Redirect.NORMAL)
@@ -176,6 +191,66 @@ public class CapaService {
     }
 
     /**
+     * Retorna a sinopse (description do Google Books) do livro, ou {@code null}
+     * se nao houver. Mesma estrategia de cache + falhas transitorias do {@link
+     * #resolverCapa}. Open Library nao retorna descricoes, entao so consultamos
+     * Google Books — se a chave de API nao estiver configurada, retorna null.
+     */
+    public String resolverSinopse(String isbn, String titulo, String autor) {
+        if (googleBooksApiKey.isEmpty()) {
+            return null;
+        }
+        String chave = chaveCache(isbn, titulo, autor);
+        if (chave.isEmpty()) {
+            return null;
+        }
+        String cached = cacheSinopse.get(chave);
+        if (cached != null) {
+            return cached.isEmpty() ? null : cached;
+        }
+
+        boolean erroTransitorio = false;
+        String isbnNorm = Isbn.normalize(isbn);
+        if (isbnNorm == null) {
+            isbnNorm = "";
+        }
+
+        // Mesma ordem da capa: ISBN primeiro (edicao exata, sinopse mais consistente
+        // com o que o aluno tem em maos), depois titulo+autor (obra).
+        if (!isbnNorm.isEmpty()) {
+            try {
+                String descricao = consultarGoogleBooksDescricao("isbn:" + isbnNorm);
+                if (descricao != null) {
+                    cacheSinopse.put(chave, descricao);
+                    return descricao;
+                }
+            } catch (Exception e) {
+                log.warn("Google Books sinopse (ISBN {}) falhou: {}", isbnNorm, e.toString());
+                erroTransitorio = true;
+            }
+        }
+        if (temTexto(titulo)) {
+            try {
+                String query = "intitle:" + titulo
+                    + (temTexto(autor) ? " inauthor:" + autor : "");
+                String descricao = consultarGoogleBooksDescricao(query);
+                if (descricao != null) {
+                    cacheSinopse.put(chave, descricao);
+                    return descricao;
+                }
+            } catch (Exception e) {
+                log.warn("Google Books sinopse (titulo '{}') falhou: {}", titulo, e.toString());
+                erroTransitorio = true;
+            }
+        }
+
+        if (!erroTransitorio) {
+            cacheSinopse.put(chave, "");
+        }
+        return null;
+    }
+
+    /**
      * Consulta a Google Books API com uma expressao de busca livre (ex.:
      * {@code "isbn:9788535910663"} ou {@code "intitle:Dom Casmurro inauthor:Machado de Assis"}).
      * Retorna a URL da capa do primeiro resultado que tiver imagem, ou null.
@@ -200,6 +275,37 @@ public class CapaService {
         GoogleBooksResponse dados = objectMapper.readValue(resp.body(), GoogleBooksResponse.class);
         String capa = dados.primeiraImagem();
         return capa == null ? null : tratarUrlGoogle(capa);
+    }
+
+    /**
+     * Mesma chamada de {@link #consultarGoogleBooks(String)}, mas extrai a
+     * descricao (sinopse) do primeiro resultado que tiver. Limita a 2000
+     * caracteres pra caber no schema.
+     */
+    private String consultarGoogleBooksDescricao(String query) throws Exception {
+        String url = GOOGLE_BOOKS_URL + URLEncoder.encode(query, StandardCharsets.UTF_8)
+            + "&key=" + URLEncoder.encode(googleBooksApiKey, StandardCharsets.UTF_8);
+
+        HttpResponse<String> resp = httpClient.send(
+            HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(6))
+                .header("Accept", "application/json")
+                .GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        if (resp.statusCode() == 429) {
+            throw new IllegalStateException("Google Books HTTP 429 (rate limit)");
+        }
+        if (resp.statusCode() != 200) {
+            throw new IllegalStateException("Google Books HTTP " + resp.statusCode());
+        }
+        GoogleBooksResponse dados = objectMapper.readValue(resp.body(), GoogleBooksResponse.class);
+        String descricao = dados.primeiraDescricao();
+        if (descricao == null || descricao.isBlank()) {
+            return null;
+        }
+        String t = descricao.trim();
+        return t.length() > 2000 ? t.substring(0, 2000) : t;
     }
 
     /**
@@ -314,11 +420,28 @@ public class CapaService {
             return null;
         }
 
+        /** Descricao do primeiro resultado que tiver description nao-vazia, ou null. */
+        String primeiraDescricao() {
+            if (items == null) {
+                return null;
+            }
+            for (Item item : items) {
+                if (item.volumeInfo() == null) {
+                    continue;
+                }
+                String d = item.volumeInfo().description();
+                if (d != null && !d.isBlank()) {
+                    return d;
+                }
+            }
+            return null;
+        }
+
         @JsonIgnoreProperties(ignoreUnknown = true)
         record Item(VolumeInfo volumeInfo) {}
 
         @JsonIgnoreProperties(ignoreUnknown = true)
-        record VolumeInfo(ImageLinks imageLinks) {}
+        record VolumeInfo(ImageLinks imageLinks, String description) {}
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         record ImageLinks(String thumbnail, String smallThumbnail) {}

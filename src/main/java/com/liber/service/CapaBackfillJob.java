@@ -45,30 +45,65 @@ public class CapaBackfillJob {
             return; // ja ha uma execucao em andamento
         }
         try {
-            List<Livro> semCapa = livroRepository.findByIsbnIsNotNullAndCapaUrlIsNull();
-            if (semCapa.isEmpty()) {
-                return;
-            }
-            log.info("CapaBackfill: resolvendo capa de {} livro(s)...", semCapa.size());
-
-            int preenchidas = 0;
-            for (Livro livro : semCapa) {
-                String url = capaService.resolverCapa(
-                    livro.getIsbn(), livro.getTitulo(), livro.getAutor());
-                if (url != null) {
-                    livroService.definirCapa(livro.getId(), url);
-                    preenchidas++;
-                }
-                try {
-                    Thread.sleep(PAUSA_ENTRE_CONSULTAS_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            log.info("CapaBackfill: {} de {} capas preenchidas.", preenchidas, semCapa.size());
+            preencherCapas();
+            preencherSinopses();
         } finally {
             rodando.set(false);
+        }
+    }
+
+    private void preencherCapas() {
+        List<Livro> semCapa = livroRepository.findByIsbnIsNotNullAndCapaUrlIsNull();
+        if (semCapa.isEmpty()) {
+            return;
+        }
+        log.info("CapaBackfill: resolvendo capa de {} livro(s)...", semCapa.size());
+
+        int preenchidas = 0;
+        for (Livro livro : semCapa) {
+            String url = capaService.resolverCapa(
+                livro.getIsbn(), livro.getTitulo(), livro.getAutor());
+            if (url != null) {
+                livroService.definirCapa(livro.getId(), url);
+                preenchidas++;
+            }
+            if (!pausa()) {
+                return;
+            }
+        }
+        log.info("CapaBackfill: {} de {} capas preenchidas.", preenchidas, semCapa.size());
+    }
+
+    private void preencherSinopses() {
+        List<Livro> semSinopse = livroRepository.findByIsbnIsNotNullAndSinopseIsNull();
+        if (semSinopse.isEmpty()) {
+            return;
+        }
+        log.info("CapaBackfill: resolvendo sinopse de {} livro(s)...", semSinopse.size());
+
+        int preenchidas = 0;
+        for (Livro livro : semSinopse) {
+            String sinopse = capaService.resolverSinopse(
+                livro.getIsbn(), livro.getTitulo(), livro.getAutor());
+            if (sinopse != null) {
+                livroService.definirSinopse(livro.getId(), sinopse);
+                preenchidas++;
+            }
+            if (!pausa()) {
+                return;
+            }
+        }
+        log.info("CapaBackfill: {} de {} sinopses preenchidas.", preenchidas, semSinopse.size());
+    }
+
+    /** Espaca consultas pra nao estourar rate limit. Retorna false se foi interrompido. */
+    private boolean pausa() {
+        try {
+            Thread.sleep(PAUSA_ENTRE_CONSULTAS_MS);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

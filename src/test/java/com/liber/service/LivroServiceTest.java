@@ -33,7 +33,7 @@ class LivroServiceTest {
 
     @Test
     void cadastrar_inicializa_quantidade_disponivel_igual_a_exemplares() {
-        LivroRequest req = new LivroRequest("Dom Casmurro", "Machado de Assis", null, 1899, 5);
+        LivroRequest req = new LivroRequest("Dom Casmurro", "Machado de Assis", null, 1899, 5, null);
         when(livroRepository.save(any(Livro.class))).thenAnswer(inv -> inv.getArgument(0));
 
         LivroResponse resp = service.cadastrar(req);
@@ -44,7 +44,7 @@ class LivroServiceTest {
 
     @Test
     void cadastrar_rejeita_isbn_duplicado() {
-        LivroRequest req = new LivroRequest("X", "Y", "9788535914849", 2020, 3);
+        LivroRequest req = new LivroRequest("X", "Y", "9788535914849", 2020, 3, null);
         when(livroRepository.existsByIsbn("9788535914849")).thenReturn(true);
 
         assertThatThrownBy(() -> service.cadastrar(req))
@@ -65,7 +65,7 @@ class LivroServiceTest {
         when(livroRepository.save(any(Livro.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Reduz para 5 exemplares
-        LivroRequest req = new LivroRequest("X", "Y", null, 2020, 5);
+        LivroRequest req = new LivroRequest("X", "Y", null, 2020, 5, null);
         LivroResponse resp = service.atualizar(1L, req);
 
         assertThat(resp.quantidadeExemplares()).isEqualTo(5);
@@ -84,7 +84,7 @@ class LivroServiceTest {
             .thenReturn(5L);
 
         // Tenta reduzir para 3 — mas ha 5 ativos, deve falhar
-        LivroRequest req = new LivroRequest("X", "Y", null, 2020, 3);
+        LivroRequest req = new LivroRequest("X", "Y", null, 2020, 3, null);
 
         assertThatThrownBy(() -> service.atualizar(1L, req))
             .isInstanceOf(RegraEmprestimoException.class);

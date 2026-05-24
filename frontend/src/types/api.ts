@@ -69,6 +69,8 @@ export interface LivroResponse {
   capaUrl: string | null;
   /** true quando a capa foi enviada manualmente (nao e sobrescrita pela busca). */
   capaManual: boolean;
+  /** Sinopse do livro — editavel pelo bibliotecario ou auto-populada pelo Google Books. */
+  sinopse: string | null;
   createdAt: string;
   updatedAt: string;
 }

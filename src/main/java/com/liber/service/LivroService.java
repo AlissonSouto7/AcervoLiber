@@ -74,6 +74,7 @@ public class LivroService {
             .quantidadeExemplares(req.quantidadeExemplares())
             .quantidadeDisponivel(req.quantidadeExemplares())
             .capaUrl(null)
+            .sinopse(normalizarSinopse(req.sinopse()))
             .build();
 
         Livro salvo = livroRepository.save(livro);
@@ -116,6 +117,7 @@ public class LivroService {
         // Calculado direto a partir dos exemplares em uso — independente do estado
         // anterior de quantidadeDisponivel (robusto contra eventuais drifts).
         livro.setQuantidadeDisponivel(req.quantidadeExemplares() - (int) emUso);
+        livro.setSinopse(normalizarSinopse(req.sinopse()));
 
         // ISBN, titulo ou autor mudou -> capa automatica fica obsoleta. Limpa para
         // o CapaBackfillJob re-resolver em background; nao resolvemos sincronamente
@@ -178,6 +180,42 @@ public class LivroService {
                 livroRepository.save(livro);
             }
         });
+    }
+
+    /**
+     * Define a sinopse vinda do backfill — so se o livro AINDA nao tiver sinopse.
+     * Sinopse cadastrada manualmente pelo bibliotecario sempre vence (se quiser
+     * que o automatico re-popule, basta limpar a sinopse pela tela e o backfill
+     * preenche no proximo ciclo).
+     */
+    @Transactional
+    public void definirSinopse(Long id, String sinopse) {
+        String norm = normalizarSinopse(sinopse);
+        if (norm == null) {
+            return;
+        }
+        livroRepository.findById(id).ifPresent(livro -> {
+            if (livro.getSinopse() == null) {
+                livro.setSinopse(norm);
+                livroRepository.save(livro);
+            }
+        });
+    }
+
+    /**
+     * Vazio/branco vira null (rule simples pro check "tem sinopse?"). Trunca a
+     * 2000 caracteres como defesa extra alem do {@code @Size} do request — o
+     * backfill nao passa pelo validator do Bean Validation.
+     */
+    private static String normalizarSinopse(String sinopse) {
+        if (sinopse == null) {
+            return null;
+        }
+        String t = sinopse.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        return t.length() > 2000 ? t.substring(0, 2000) : t;
     }
 
     /**

@@ -160,6 +160,7 @@ export default function LivrosPage() {
         isbn: editando.isbn ?? undefined,
         ano: editando.ano ?? undefined,
         quantidadeExemplares: editando.quantidadeExemplares,
+        sinopse: editando.sinopse ?? undefined,
       }
     : { quantidadeExemplares: 1 };
 
@@ -361,6 +362,14 @@ export default function LivrosPage() {
               rules={[{ required: true, message: 'Informe a quantidade' }]}
             >
               <InputNumber style={{ width: '100%' }} min={1} />
+            </Form.Item>
+            <Form.Item
+              name="sinopse"
+              label="Sinopse"
+              extra="Opcional. Se vazia, será preenchida automaticamente a partir do Google Books quando disponível."
+              rules={[{ max: 2000, message: 'A sinopse deve ter no máximo 2000 caracteres' }]}
+            >
+              <Input.TextArea rows={5} maxLength={2000} showCount placeholder="Breve resumo do livro" />
             </Form.Item>
             <Button type="primary" htmlType="submit" block loading={salvar.isPending}>
               Salvar
