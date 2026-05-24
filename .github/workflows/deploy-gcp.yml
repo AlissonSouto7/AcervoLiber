@@ -35,8 +35,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BACKEND: ${{ github.repository_owner }}/liber-app
-  IMAGE_FRONTEND: ${{ github.repository_owner }}/liber-frontend
+  IMAGE_BACKEND: alissonsouto7/liber-app
+  IMAGE_FRONTEND: alissonsouto7/liber-frontend
 
 jobs:
   build-and-push:
@@ -129,8 +129,8 @@ jobs:
             fi
 
             # 3. Aponta as imagens pro GHCR (sobrepõe os defaults do compose)
-            export APP_IMAGE="ghcr.io/${{ github.repository_owner }}/liber-app:latest"
-            export FRONTEND_IMAGE="ghcr.io/${{ github.repository_owner }}/liber-frontend:latest"
+            export APP_IMAGE="ghcr.io/alissonsouto7/liber-app:latest"
+            export FRONTEND_IMAGE="ghcr.io/alissonsouto7/liber-frontend:latest"
 
             # 4. Pull + recreate (sem build local — confiança no que veio do CI)
             docker compose \
