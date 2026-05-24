@@ -1,124 +1,245 @@
-# AcervoLiber
+# 📚 AcervoLiber
 
-Sistema de gestão de biblioteca escolar — cadastro de livros e alunos, controle de empréstimos e devoluções, reservas via portal do aluno, e trilha de auditoria.
+> Sistema de gestão de biblioteca escolar — completo, gratuito e open source.
 
-Desenvolvido para a escola Gabriel José Pereira.
+[![CI](https://github.com/AlissonSouto7/AcervoLiber/actions/workflows/ci.yml/badge.svg)](https://github.com/AlissonSouto7/AcervoLiber/actions/workflows/ci.yml)
+[![Deploy GCP](https://github.com/AlissonSouto7/AcervoLiber/actions/workflows/deploy-gcp.yml/badge.svg)](https://github.com/AlissonSouto7/AcervoLiber/actions/workflows/deploy-gcp.yml)
 
-## Stack
+**🌐 Demo em produção:** [acervoliber.duckdns.org](https://acervoliber.duckdns.org)
 
-- **Backend:** Spring Boot 4.0.6 · Java 17 · JPA/Hibernate · Flyway · Spring Security (JWT) · jjwt 0.12.6
-- **Banco:** PostgreSQL 16
-- **Frontend:** React 18 + Vite + TypeScript + Ant Design + TanStack Query + Zustand
-- **Infra:** Docker + Docker Compose · Caddy (TLS automático em prod)
+Desenvolvido como **trabalho comunitário** para a escola Gabriel José Pereira (Eunápolis-BA).
 
-## Rodando local (dev)
+---
+
+## ✨ O que faz?
+
+Substitui aquela planilha do Excel ou caderno de empréstimos por um sistema web completo:
+
+- 📖 **Cadastro do acervo** com capas automáticas (Google Books + Open Library)
+- 👥 **Cadastro de alunos** com turma e matrícula
+- 🔄 **Empréstimos** com semáforo de urgência (verde/amarelo/vermelho)
+- 🔖 **Reservas pelos alunos** via portal próprio
+- 🔐 **3 perfis** — Aluno (portal), Bibliotecário (gestão), Admin (controle total)
+- 📊 **Dashboard** com livros mais emprestados, atrasados e alertas
+- 📋 **Auditoria completa** de eventos de segurança (LGPD-friendly)
+
+---
+
+## 🎯 Quem usa?
+
+### 👨‍🎓 Aluno
+Loga com matrícula, navega no catálogo, reserva livros e acompanha "Minhas reservas".
+
+### 📖 Bibliotecário
+Cadastra livros/alunos, registra empréstimos e devoluções, gerencia reservas pendentes, renova/edita/cancela empréstimos.
+
+### 👨‍💼 Admin (Diretor)
+Tudo do bibliotecário + cria/desativa usuários da equipe + acessa a trilha de auditoria.
+
+---
+
+## 🛡️ Recursos de segurança
+
+Sistema passou por **auditoria profunda** com 269 achados identificados em 7 fases, com 40 fixes aplicados:
+
+- 🔐 **HTTPS automático** via Let's Encrypt
+- 🎫 **JWT + Refresh token rotation** com reuse detection
+- 🚫 **Account lockout** após 5 falhas + Rate limiting por IP
+- 🛑 **Bloqueio empréstimo por atraso** — aluno com livro vencido não pega novo
+- 🎭 **PII mascarada** em telas administrativas (LGPD §14, dados de menores)
+- 🔍 **Auditoria de eventos** (logins, mudanças, reuso de token = sinal de roubo)
+- 🧨 **XSS sanitization**, **CSP**, **HSTS**, **Permissions-Policy**, **COOP/CORP**
+
+Detalhes em [`AUDIT_DEEP_SECURITY.md`](AUDIT_DEEP_SECURITY.md).
+
+---
+
+## 🏗️ Stack
+
+| Camada | Tech |
+|---|---|
+| **Backend** | Spring Boot 4.0.6 · Java 17 · JPA/Hibernate · Flyway · Spring Security |
+| **Banco** | PostgreSQL 16 (Neon na produção) |
+| **Frontend** | React 18 + Vite + TypeScript + Ant Design + TanStack Query + Zustand |
+| **Infra** | Docker · Docker Compose · Caddy 2 (TLS automático) |
+| **Hospedagem** | GCP e2-micro (Always Free) + Neon Postgres (Free) + DuckDNS + Caddy/Let's Encrypt |
+| **CI/CD** | GitHub Actions (build amd64 + push GHCR + deploy SSH) |
+
+**Custo de hospedagem: R$ 0,00/mês** (100% free tier).
+
+---
+
+## 🚀 Rodando local (dev)
 
 Pré-requisitos: Docker Desktop + Docker Compose v2.
 
 ```bash
-# 1. Cria o volume do banco (uma vez)
+# Clonar
+git clone https://github.com/AlissonSouto7/AcervoLiber.git
+cd AcervoLiber
+
+# Volume do banco (uma vez)
 docker volume create liber-pg-data
 
-# 2. Copia o template de variaveis e ajusta valores
+# Copiar template e ajustar
 cp .env.example .env
 
-# 3. Sobe o stack inteiro (Postgres + backend + frontend)
+# Subir o stack
 docker compose up -d --build
 
-# 4. Acompanha logs
+# Acompanhar logs
 docker compose logs -f app
 ```
 
-Acessos:
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8080/api/v1
-- **Swagger UI (apenas dev):** http://localhost:8080/swagger-ui/index.html
-- **Healthcheck:** http://localhost:8080/actuator/health
+**Acessos:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8080/api/v1
+- Swagger UI (só dev): http://localhost:8080/swagger-ui/index.html
 
-## Credenciais de primeiro acesso
+**Credenciais de primeiro acesso:** se `ADMIN_PASSWORD` no `.env` estiver vazia, o `AdminSeeder` gera uma senha aleatória e loga uma única vez no startup. Procura em `docker compose logs app | grep "Senha do admin"`.
 
-No primeiro boot, o `AdminSeeder` cria o usuário admin a partir das variáveis `ADMIN_EMAIL` / `ADMIN_PASSWORD` do `.env`. Se `ADMIN_PASSWORD` estiver vazio, o seeder **gera uma senha aleatória forte e loga uma única vez** no startup (`grep "Senha do admin" nos logs`).
+---
 
-Em dev, com `SEED_DADOS_EXEMPLO=true` no `.env`, o `DadosExemploSeeder` popula livros/alunos/empréstimos de teste. As credenciais de teste estão documentadas em `seed-teste.sh`.
+## 🌐 Deploy em produção
 
-## Variáveis de ambiente principais
+Veja [`docs/RUNBOOK.md`](docs/RUNBOOK.md) para o procedimento completo:
 
-| Variável | Obrigatória? | Default | Descrição |
-|---|---|---|---|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | sim | `postgres` / `postgres` / `liber` | Credenciais do banco |
-| `JWT_SECRET` | **sim em prod** | string dev (falha startup em prod) | Gerar com `openssl rand -base64 48` |
-| `JWT_EXPIRATION_MS` | não | `900000` (15min) | Validade do access token |
-| `JWT_REFRESH_EXPIRATION_MS` | não | `604800000` (7d) | Validade do refresh token |
-| `CORS_ALLOWED_ORIGINS` | sim em prod | `localhost:*` | Lista de origens separadas por vírgula |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | sim | — | Admin inicial (senha vazia = gerada aleatória) |
-| `SPRING_PROFILES_ACTIVE` | recomendado em prod | `dev` | Usar `prod` em produção |
-| `SEED_DADOS_EXEMPLO` | não | `false` | Popular dados de teste no boot |
-| `GOOGLE_BOOKS_API_KEY` | não | vazio | Acelera resolução de capas |
+- Setup inicial da VM (Docker, firewall, swap)
+- Configuração do `.env.prod` com secrets reais
+- HTTPS automático via Caddy + Let's Encrypt + DuckDNS
+- Backup e restore do banco
+- Rotação de secrets
+- Troubleshooting comum
 
-Lista completa em `.env.example` e `.env.prod.example`.
+**CI/CD:** `git push origin main` → build de imagens amd64 → push GHCR → SSH na VM → `docker compose pull && up -d` (~10 min).
 
-## Estrutura do projeto
+---
+
+## 📂 Estrutura
 
 ```
 liber/
 ├── src/                          backend Spring Boot
 │   ├── main/
 │   │   ├── java/com/liber/
-│   │   │   ├── config/           SecurityConfig, OpenApiConfig, etc.
-│   │   │   ├── controller/       endpoints REST
+│   │   │   ├── config/           SecurityConfig, properties, etc.
+│   │   │   ├── controller/       8 controllers REST
 │   │   │   ├── service/          regras de negócio
 │   │   │   ├── repository/       JPA repositories
 │   │   │   ├── entity/           entidades JPA
 │   │   │   ├── dto/              records de request/response
-│   │   │   ├── security/         JwtService, filtros
-│   │   │   └── seeder/           AdminSeeder, DadosExemploSeeder
+│   │   │   ├── security/         JwtService, filtros, lockout
+│   │   │   └── seeder/           AdminSeeder + DadosExemploSeeder
 │   │   └── resources/
 │   │       ├── application*.properties
-│   │       └── db/migration/     migrations Flyway V1__*..V13__*
-│   └── test/                     unitários + integração (Testcontainers)
+│   │       └── db/migration/     migrations Flyway V1..V15
+│   └── test/                     68 testes unitários + 3 ITs (Testcontainers)
 ├── frontend/                     SPA React+Vite
 │   ├── src/
-│   │   ├── pages/                LoginPage, DashboardPage, LivrosPage, etc.
-│   │   ├── api/                  clientes axios + queries TanStack
+│   │   ├── pages/                13 páginas
+│   │   ├── api/                  clientes axios + TanStack queries
 │   │   ├── auth/                 authStore (Zustand)
 │   │   └── components/           AppLayout, ProtectedRoute, etc.
 │   ├── nginx.conf                proxy /api → app:8080
 │   └── Dockerfile
-├── docker-compose.yml            stack base (dev/prod)
-├── docker-compose.prod.yml       overlay produção (Caddy + backup)
+├── docker-compose.yml            stack base (dev local)
+├── docker-compose.prod.yml       overlay produção Oracle ARM (com Postgres local)
+├── docker-compose.gcp.yml        overlay produção GCP (sem Postgres, usa Neon)
 ├── Caddyfile                     reverse proxy + TLS automático
 ├── scripts/backup.sh             pg_dump diário rotacionando 30d
-├── .github/workflows/            CI + Deploy
+├── .github/workflows/            CI + CD
+│   ├── ci.yml                    testes em PR e push
+│   └── deploy-gcp.yml            deploy automático em push main
 └── docs/RUNBOOK.md               operação em produção
 ```
 
-## Branches
+---
 
-- `main` — código em produção. Protegida (PR + CI verde obrigatório).
-- `dev` — integração. Recebe PRs das branches de feature.
-- `alisson` — branch pessoal de trabalho (deriva de `dev`).
+## 🌿 Branches
 
-Fluxo: `alisson` → PR para `dev` → após aprovação, `dev` → PR para `main` → deploy automático.
+- **`main`** — código em produção (CI/CD dispara deploy automático em cada push)
+- **`dev`** — integração (recebe PRs das branches de feature)
+- **`alisson`** — branch pessoal de trabalho
 
-## Testes
+**Fluxo:** `alisson` → PR para `main` → CI verde → merge → deploy automático.
+
+---
+
+## 🧪 Testes
 
 ```bash
-# Unitarios (rapidos, sem Docker)
+# Unitários (rápidos, sem Docker)
 ./mvnw test
 
-# Inclui testes de integracao (Testcontainers — precisa Docker rodando)
+# Inclui testes de integração (Testcontainers — precisa Docker)
 ./mvnw verify
 
 # Frontend
-cd frontend && npm run build   # build (typecheck + bundle)
+cd frontend && npm run build   # typecheck + bundle
 ```
 
-## Operação em produção
+**Cobertura atual:**
+- ✅ 68 testes unitários (Services + Security)
+- ✅ 3 ITs end-to-end (admin flow + emprestimo flow + sanity)
+- ❌ Sem `@WebMvcTest` ainda (controllers ainda sem cobertura)
+- ❌ Sem testes de frontend ainda
 
-Veja [`docs/RUNBOOK.md`](docs/RUNBOOK.md): deploy, backup/restore, criar bibliotecário, rotacionar `JWT_SECRET`, destravar conta admin, troubleshooting.
+---
 
-## Segurança
+## 📋 Roadmap
 
-Auditoria profunda em `AUDIT_DEEP_SECURITY.md` — 7 fases, 269 achados, 31 fixes aplicados ao vivo. Pendências priorizadas em `AUDIT_PENDENCIAS.md`.
+### ✅ Feito
+- CRUD de Livros, Alunos, Empréstimos, Reservas
+- Portal do Aluno (catálogo + reservas)
+- Renovação, edição, cancelamento de empréstimo
+- Bloqueio por atraso
+- PII mascarada em listagens admin
+- Dashboard + Auditoria
+- HTTPS + CI/CD
+- Migration V1 → V15 (estável)
 
-**Reportar vulnerabilidade:** abra uma issue privada (security advisory) ao invés de issue pública.
+### 🟡 Próximo (P1)
+- Relatórios CSV (lista de atrasados, inventário, devedores)
+- Notificação ao aluno (badge in-app quando reserva confirmada)
+- Testes `@WebMvcTest` nos controllers
+- Lint do frontend (ESLint + Prettier)
+
+### 🔵 Futuro (P2)
+- Gestão de turmas como entidade (com promoção fim de ano)
+- Busca avançada de livros (filtro gênero, "só disponíveis")
+- Acessibilidade (WCAG)
+- Observabilidade (métricas de negócio + tracing)
+
+Veja [`AUDIT_PENDENCIAS.md`](AUDIT_PENDENCIAS.md) pra lista completa.
+
+---
+
+## 🤝 Contribuindo
+
+PRs welcome! Algumas regras:
+
+1. **Branch a partir de `main`**, mas faz PR pra `dev` (não direto pra main)
+2. **Migration Flyway**: nunca edite uma já aplicada — crie nova com versão maior
+3. **Commits** seguem [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`)
+4. **Testes** obrigatórios em código novo de Service/Controller
+5. **PII**: nunca exponha matrícula/nome de aluno completo em listagens admin sem mascarar
+
+---
+
+## 🐛 Reportar vulnerabilidade
+
+Por favor **não abra issue pública**. Use [GitHub Security Advisories](https://github.com/AlissonSouto7/AcervoLiber/security/advisories/new) (privado).
+
+---
+
+## 📜 Licença
+
+Projeto educacional/comunitário. Use à vontade, atribua quando possível.
+
+---
+
+## 💌 Créditos
+
+Sistema concebido e desenvolvido por **Alisson Pinheiro Souto** ([@AlissonSouto7](https://github.com/AlissonSouto7)) para a escola Gabriel José Pereira (Eunápolis-BA, 2026).
+
+Com auxílio de Claude (Anthropic) em 3 áreas: auditoria de segurança profunda, arquitetura de produção e setup de infra/CI-CD.
