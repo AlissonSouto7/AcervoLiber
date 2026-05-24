@@ -50,7 +50,6 @@ class ReservaServiceTest {
     @Mock UsuarioRepository usuarioRepository;
     @Mock EmprestimoRepository emprestimoRepository;
     @Mock EmprestimoService emprestimoService;
-    @Mock AuditService auditService;
 
     private final ReservaProperties reservaProps = new ReservaProperties(3);
     private final EmprestimoProperties emprestimoProps = new EmprestimoProperties(7, 30, 3, 2);
@@ -59,7 +58,7 @@ class ReservaServiceTest {
     @BeforeEach
     void setUp() {
         service = new ReservaService(reservaRepository, livroRepository, alunoRepository,
-            usuarioRepository, emprestimoRepository, emprestimoService, auditService,
+            usuarioRepository, emprestimoRepository, emprestimoService,
             reservaProps, emprestimoProps, CLOCK);
     }
 

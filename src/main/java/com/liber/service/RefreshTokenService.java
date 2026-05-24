@@ -1,7 +1,6 @@
 package com.liber.service;
 
 import com.liber.config.JwtProperties;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.RefreshToken;
 import com.liber.entity.Usuario;
 import com.liber.exception.RefreshTokenInvalidoException;
@@ -39,7 +38,6 @@ public class RefreshTokenService {
     private final RefreshTokenRepository repository;
     private final JwtProperties jwtProperties;
     private final Clock clock;
-    private final AuditService auditService;
 
     /** Resultado de uma rotacao: usuario dono + novo refresh token em texto puro. */
     public record Rotacao(Usuario usuario, String novoRefreshToken) {}
@@ -65,13 +63,11 @@ public class RefreshTokenService {
 
         if (atual.isRevogado()) {
             // Token revogado reapresentado — possivel roubo. Revoga toda a familia.
+            // Sinal de seguranca importante: grep "REFRESH_REUSO" nos logs JSON
+            // pra alertar / investigar.
             int revogados = repository.revogarTodosDoUsuario(atual.getUsuario().getId(), agora);
-            log.warn("Reuso de refresh token detectado para usuario id={} — {} tokens revogados",
-                atual.getUsuario().getId(), revogados);
-            // Auditoria: sinal mais importante da trilha de seguranca — token roubado.
-            auditService.registrar(EventoAuditoria.REFRESH_REUSO,
-                atual.getUsuario().getEmail(),
-                "Reuso detectado — " + revogados + " sessoes encerradas");
+            log.warn("REFRESH_REUSO detectado para usuario id={} email={} — {} sessoes encerradas",
+                atual.getUsuario().getId(), atual.getUsuario().getEmail(), revogados);
             throw new RefreshTokenInvalidoException(
                 "Refresh token reutilizado — todas as sessoes foram encerradas por seguranca");
         }

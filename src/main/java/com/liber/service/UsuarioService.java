@@ -3,7 +3,6 @@ package com.liber.service;
 import com.liber.dto.auth.CriarUsuarioRequest;
 import com.liber.dto.auth.RegisterRequest;
 import com.liber.dto.auth.UsuarioResponse;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.Role;
 import com.liber.entity.Usuario;
 import com.liber.exception.BusinessException;
@@ -27,7 +26,6 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuditService auditService;
     private final RefreshTokenService refreshTokenService;
 
     public UsuarioResponse buscarPorEmail(String email) {
@@ -69,8 +67,6 @@ public class UsuarioService {
             .build();
 
         Usuario salvo = usuarioRepository.save(novo);
-        auditService.registrar(EventoAuditoria.USUARIO_CRIADO, salvo.getEmail(),
-            "Role: " + salvo.getRole());
         log.info("Usuario criado id={} email={} role={}", salvo.getId(), salvo.getEmail(), salvo.getRole());
         return UsuarioResponse.from(salvo);
     }
@@ -93,7 +89,6 @@ public class UsuarioService {
         }
         usuario.setNome(nome.trim());
         Usuario salvo = usuarioRepository.save(usuario);
-        auditService.registrar(EventoAuditoria.PERFIL_ATUALIZADO, salvo.getEmail(), null);
         log.info("Perfil atualizado para usuario id={}", usuario.getId());
         return UsuarioResponse.from(salvo);
     }
@@ -134,9 +129,6 @@ public class UsuarioService {
         if (!ativo) {
             refreshTokenService.revogarTodosDoUsuario(id);
         }
-        auditService.registrar(
-            ativo ? EventoAuditoria.USUARIO_ATIVADO : EventoAuditoria.USUARIO_DESATIVADO,
-            salvo.getEmail(), null);
         log.info("Status do usuario id={} alterado para ativo={}", id, ativo);
         return UsuarioResponse.from(salvo);
     }
@@ -162,7 +154,6 @@ public class UsuarioService {
         // roubado, ex.: XSS) nao sobrevive a troca de senha. O proprio usuario sera
         // pedido para logar de novo no proximo refresh — esperado.
         refreshTokenService.revogarTodosDoUsuario(usuario.getId());
-        auditService.registrar(EventoAuditoria.TROCA_SENHA, usuario.getEmail(), null);
         log.info("Senha alterada para usuario id={} email={}", usuario.getId(), usuario.getEmail());
     }
 }

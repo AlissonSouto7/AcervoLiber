@@ -5,7 +5,6 @@ import com.liber.dto.AlunoResponse;
 import com.liber.dto.auth.RegisterAlunoRequest;
 import com.liber.dto.auth.UsuarioResponse;
 import com.liber.entity.Aluno;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.Role;
 import com.liber.entity.SituacaoEmprestimo;
 import com.liber.entity.Usuario;
@@ -37,7 +36,6 @@ public class AlunoService {
     private final ReservaRepository reservaRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuditService auditService;
 
     public Page<AlunoResponse> listar(String termo, Pageable pageable) {
         return alunoRepository.buscar(termo, pageable)
@@ -168,9 +166,7 @@ public class AlunoService {
             // Race: outro request auto-cadastrando o mesmo aluno no mesmo segundo.
             throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
         }
-        auditService.registrar(EventoAuditoria.USUARIO_CRIADO, salvo.getEmail(),
-            "Auto-cadastro de aluno (matricula " + aluno.getMatricula() + ")");
-        log.info("Auto-cadastro de aluno matricula={}", aluno.getMatricula());
+        log.info("Auto-cadastro de aluno matricula={} email={}", aluno.getMatricula(), salvo.getEmail());
         return UsuarioResponse.from(salvo);
     }
 
@@ -226,9 +222,7 @@ public class AlunoService {
             throw new BusinessException(
                 "Este aluno ja possui acesso (criado por outro usuario simultaneamente).");
         }
-        auditService.registrar(EventoAuditoria.USUARIO_CRIADO, salvo.getEmail(),
-            "Acesso de aluno (matricula " + aluno.getMatricula() + ")");
-        log.info("Acesso de aluno criado para matricula={}", aluno.getMatricula());
+        log.info("Acesso de aluno criado para matricula={} email={}", aluno.getMatricula(), salvo.getEmail());
         return UsuarioResponse.from(salvo);
     }
 

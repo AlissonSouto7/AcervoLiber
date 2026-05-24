@@ -6,7 +6,6 @@ import com.liber.dto.ReservaResponse;
 import com.liber.dto.ReservaResumoResponse;
 import com.liber.entity.Aluno;
 import com.liber.entity.Emprestimo;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.Livro;
 import com.liber.entity.Reserva;
 import com.liber.entity.SituacaoEmprestimo;
@@ -51,7 +50,6 @@ public class ReservaService {
     private final UsuarioRepository usuarioRepository;
     private final EmprestimoRepository emprestimoRepository;
     private final EmprestimoService emprestimoService;
-    private final AuditService auditService;
     private final ReservaProperties reservaProps;
     private final EmprestimoProperties emprestimoProps;
     private final Clock clock;
@@ -108,11 +106,8 @@ public class ReservaService {
             .dataExpiracao(hoje.plusDays(reservaProps.validadeDias()))
             .build();
         Reserva salva = reservaRepository.save(reserva);
-        log.info("Reserva criada id={} livro={} aluno={}", salva.getId(), livroId, alunoId);
-        auditService.registrar(EventoAuditoria.RESERVA_CRIADA, emailUsuario,
-            "Reserva id=" + salva.getId() + ", livro id=" + livroId
-                + ", aluno matricula=" + aluno.getMatricula()
-                + ", validade ate " + salva.getDataExpiracao());
+        log.info("Reserva criada id={} livro={} aluno_matricula={} validade={}",
+            salva.getId(), livroId, aluno.getMatricula(), salva.getDataExpiracao());
         return ReservaResponse.from(salva);
     }
 
@@ -142,10 +137,8 @@ public class ReservaService {
         reserva.setDataResolucao(Instant.now(clock));
         reservaRepository.save(reserva);
         devolverExemplar(reserva, "cancelamento");
-        log.info("Reserva cancelada id={}", reservaId);
-        auditService.registrar(EventoAuditoria.RESERVA_CANCELADA, emailUsuario,
-            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
-                + ", aluno matricula=" + reserva.getAluno().getMatricula());
+        log.info("Reserva cancelada id={} livro={} aluno_matricula={}",
+            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula());
     }
 
     // ---------- Acoes do bibliotecario ----------
@@ -166,14 +159,10 @@ public class ReservaService {
         reserva.setStatus(StatusReserva.CONFIRMADA);
         reserva.setDataResolucao(Instant.now(clock));
         reserva.setEmprestimo(emprestimo);
-        log.info("Reserva confirmada id={} -> emprestimo id={}", reservaId, emprestimo.getId());
+        log.info("Reserva confirmada id={} livro={} aluno_matricula={} -> emprestimo id={} prazo={}d",
+            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula(),
+            emprestimo.getId(), prazoDias);
         Reserva salva = reservaRepository.save(reserva);
-        auditService.registrar(EventoAuditoria.RESERVA_CONFIRMADA,
-            emailDoAluno(reserva.getAluno()),
-            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
-                + ", aluno matricula=" + reserva.getAluno().getMatricula()
-                + ", emprestimo id=" + emprestimo.getId()
-                + ", prazo=" + prazoDias + "d");
         return ReservaResponse.from(salva);
     }
 
@@ -183,12 +172,9 @@ public class ReservaService {
         reserva.setStatus(StatusReserva.RECUSADA);
         reserva.setDataResolucao(Instant.now(clock));
         devolverExemplar(reserva, "recusa");
-        log.info("Reserva recusada id={}", reservaId);
+        log.info("Reserva recusada id={} livro={} aluno_matricula={}",
+            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula());
         Reserva salva = reservaRepository.save(reserva);
-        auditService.registrar(EventoAuditoria.RESERVA_RECUSADA,
-            emailDoAluno(reserva.getAluno()),
-            "Reserva id=" + reservaId + ", livro id=" + reserva.getLivro().getId()
-                + ", aluno matricula=" + reserva.getAluno().getMatricula());
         return ReservaResponse.from(salva);
     }
 
@@ -205,15 +191,10 @@ public class ReservaService {
             devolverExemplar(reserva, "expiracao");
         }
         reservaRepository.saveAll(vencidas);
-        // Auditoria por reserva (1 evento cada) — REQUIRES_NEW do AuditService isola
-        // falhas individuais. Job nao tem auth, entao ator fica null.
         for (Reserva reserva : vencidas) {
-            auditService.registrar(EventoAuditoria.RESERVA_EXPIRADA,
-                emailDoAluno(reserva.getAluno()),
-                "Reserva id=" + reserva.getId()
-                    + ", livro id=" + reserva.getLivro().getId()
-                    + ", aluno matricula=" + reserva.getAluno().getMatricula()
-                    + ", expirou em " + reserva.getDataExpiracao());
+            log.info("Reserva expirada id={} livro={} aluno_matricula={} expirou_em={}",
+                reserva.getId(), reserva.getLivro().getId(),
+                reserva.getAluno().getMatricula(), reserva.getDataExpiracao());
         }
         return vencidas.size();
     }
@@ -242,22 +223,6 @@ public class ReservaService {
             throw new BusinessException("Este usuario nao esta vinculado a um aluno.");
         }
         return aluno.getId();
-    }
-
-    /**
-     * Email do {@code Usuario} vinculado ao aluno — usado como {@code usuarioEmail} no
-     * audit log (o "sujeito" do evento). A entidade Aluno nao tem mapping reverso
-     * para Usuario; resolvemos pelo lookup via matricula (unique). Retorna {@code null}
-     * se o aluno nao tiver acesso ao portal (sem Usuario) — improvavel num fluxo de
-     * reserva real (so loga quem tem login), mas defensivo.
-     */
-    private String emailDoAluno(Aluno aluno) {
-        if (aluno == null) {
-            return null;
-        }
-        return usuarioRepository.findByAlunoMatricula(aluno.getMatricula())
-            .map(Usuario::getEmail)
-            .orElse(null);
     }
 
     private Reserva carregarPendente(Long id) {

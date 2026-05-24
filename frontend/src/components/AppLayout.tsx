@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  AuditOutlined,
   BookOutlined,
   CarryOutOutlined,
   DashboardOutlined,
@@ -36,7 +35,6 @@ const ITENS_STAFF = [
 // Itens visiveis apenas para ADMIN
 const ITENS_ADMIN = [
   { key: '/usuarios', icon: <IdcardOutlined />, label: 'Usuários' },
-  { key: '/auditoria', icon: <AuditOutlined />, label: 'Auditoria' },
 ];
 
 // Itens do aluno

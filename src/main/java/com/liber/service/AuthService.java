@@ -5,7 +5,6 @@ import com.liber.dto.auth.LoginRequest;
 import com.liber.dto.auth.LoginResponse;
 import com.liber.dto.auth.RegisterRequest;
 import com.liber.dto.auth.UsuarioResponse;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.Role;
 import com.liber.entity.Usuario;
 import com.liber.exception.ContaBloqueadaException;
@@ -37,7 +36,6 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
-    private final AuditService auditService;
     // Injetado como proxy request-scoped pelo Spring — resolve para o request atual.
     // Usado para extrair o IP do cliente no lockout por (email + IP), evitando
     // poisoning (atacante de um IP nao bloqueia a conta da vitima em outro IP).
@@ -57,11 +55,9 @@ public class AuthService {
             .filter(u -> u.getRole() == Role.ALUNO)
             .orElse(null);
         if (usuario == null) {
-            // Auditoria coerente com o caminho da equipe: matricula desconhecida
-            // tambem vira LOGIN_FALHA (gap antes — atacante varria matriculas
-            // sem deixar trilha porque caia no orElseThrow direto).
-            auditService.registrar(EventoAuditoria.LOGIN_FALHA, null,
-                "Matricula inexistente: " + matricula + " (IP=" + clientIp() + ")");
+            // Loga: tentativa de login com matricula inexistente. Investigação
+            // de probing/varredura: grep "Matricula inexistente" nos logs.
+            log.warn("Login falhou: matricula inexistente {} (IP={})", matricula, clientIp());
             throw new BadCredentialsException("Matricula ou senha incorretos");
         }
         return autenticar(usuario.getEmail(), req.senha());
@@ -76,8 +72,7 @@ public class AuthService {
         try {
             loginAttemptService.verificarBloqueio(email, ip);
         } catch (ContaBloqueadaException e) {
-            auditService.registrar(EventoAuditoria.LOGIN_BLOQUEADO, email,
-                "Conta bloqueada por tentativas (IP=" + ip + ")");
+            log.warn("Login bloqueado por tentativas: email={} IP={}", email, ip);
             throw e;
         }
 
@@ -87,8 +82,7 @@ public class AuthService {
             );
         } catch (AuthenticationException e) {
             loginAttemptService.registrarFalha(email, ip);
-            auditService.registrar(EventoAuditoria.LOGIN_FALHA, email,
-                "Credenciais invalidas (IP=" + ip + ")");
+            log.warn("Login falhou: credenciais invalidas email={} IP={}", email, ip);
             throw e;
         }
         loginAttemptService.registrarSucesso(email, ip);
@@ -96,10 +90,6 @@ public class AuthService {
         Usuario usuario = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new IllegalStateException("Usuario autenticado mas nao encontrado: " + email));
 
-        // Login bem-sucedido NAO vai para a trilha de auditoria — e ruido (acontece
-        // o tempo todo) e de baixo valor. A auditoria fica focada em eventos de
-        // seguranca: falha/bloqueio de login, logout, troca de senha e gestao de
-        // usuarios. O acesso bem-sucedido continua no log da aplicacao (abaixo).
         log.info("Login bem-sucedido email={}", email);
         return emitirTokens(usuario);
     }
@@ -127,7 +117,7 @@ public class AuthService {
             u.setPasswordChangedAt(Instant.now());
             usuarioRepository.save(u);
         });
-        auditService.registrar(EventoAuditoria.LOGOUT, principalEmail, "Refresh token revogado");
+        log.info("Logout email={} (refresh token revogado)", principalEmail);
     }
 
     @Transactional

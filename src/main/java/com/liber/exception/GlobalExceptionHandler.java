@@ -1,7 +1,5 @@
 package com.liber.exception;
 
-import com.liber.entity.EventoAuditoria;
-import com.liber.service.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
@@ -26,8 +24,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RequiredArgsConstructor
 @Slf4j
 public class GlobalExceptionHandler {
-
-    private final AuditService auditService;
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
@@ -102,16 +98,10 @@ public class GlobalExceptionHandler {
      * Acesso negado pela autorizacao em nivel de metodo ({@code @PreAuthorize}).
      * Sem este handler a excecao escaparia para o handler generico e viraria 500 —
      * o cliente deve receber 403 (proibido), nao 500 (erro interno).
-     *
-     * <p>Registra ACESSO_NEGADO na trilha de auditoria: o {@code RestAccessDeniedHandler}
-     * do filtro do Spring Security cuida das denegacoes de chain (matcher-based),
-     * mas @PreAuthorize lanca AccessDeniedException no AOP que escapa pra ca — sem
-     * a auditoria aqui, denegacoes de metodos (a maioria) passavam em silencio.
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
-        auditService.registrar(EventoAuditoria.ACESSO_NEGADO, null,
-            req.getMethod() + " " + req.getRequestURI());
+        log.warn("Acesso negado: {} {}", req.getMethod(), req.getRequestURI());
         return build(HttpStatus.FORBIDDEN, "Acesso negado",
             "Voce nao tem permissao para acessar este recurso.", req);
     }

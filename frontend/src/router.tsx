@@ -16,7 +16,6 @@ const ReservasPendentesPage = lazy(() => import('./pages/ReservasPendentesPage')
 const HistoricoPage = lazy(() => import('./pages/HistoricoPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const UsuariosPage = lazy(() => import('./pages/UsuariosPage'));
-const AuditoriaPage = lazy(() => import('./pages/AuditoriaPage'));
 const CatalogoPage = lazy(() => import('./pages/CatalogoPage'));
 const MinhasReservasPage = lazy(() => import('./pages/MinhasReservasPage'));
 
@@ -71,7 +70,6 @@ export const router = createBrowserRouter([
         element: <RoleRoute permitido={['ADMIN']} />,
         children: [
           { path: 'usuarios', element: comSuspense(UsuariosPage) },
-          { path: 'auditoria', element: comSuspense(AuditoriaPage) },
         ],
       },
 

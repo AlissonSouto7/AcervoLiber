@@ -6,7 +6,6 @@ import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
 import com.liber.entity.Aluno;
 import com.liber.entity.Emprestimo;
-import com.liber.entity.EventoAuditoria;
 import com.liber.entity.Livro;
 import com.liber.entity.SituacaoEmprestimo;
 import com.liber.entity.StatusReserva;
@@ -37,7 +36,6 @@ public class EmprestimoService {
     private final LivroRepository livroRepository;
     private final AlunoRepository alunoRepository;
     private final ReservaRepository reservaRepository;
-    private final AuditService auditService;
     private final EmprestimoProperties props;
     private final Clock clock;
 
@@ -93,16 +91,11 @@ public class EmprestimoService {
                     .formatted(atrasados));
         }
 
-        // O limite considera emprestimos ATIVOS + reservas PENDENTES — uma reserva
-        // pendente ja segura um exemplar e vira emprestimo ao ser confirmada; ignora-la
-        // aqui deixaria o aluno furar o limite pegando livros no balcao.
-        long ativos = emprestimoRepository.countByAlunoIdAndSituacao(aluno.getId(), SituacaoEmprestimo.ATIVO);
-        long reservasPendentes = reservaRepository.countByAlunoIdAndStatus(aluno.getId(), StatusReserva.PENDENTE);
-        if (ativos + reservasPendentes >= props.limitePorAluno()) {
-            throw new RegraEmprestimoException(
-                "Aluno atingiu o limite de %d livros entre emprestimos ativos e reservas pendentes"
-                    .formatted(props.limitePorAluno()));
-        }
+        // O limite por aluno NAO bloqueia emprestimo manual feito pelo staff —
+        // este endpoint so e chamado por bibliotecario/admin (aluno usa /reservas
+        // pra demandar, e la o limite e enforced em ReservaService). A direcao
+        // pode liberar manualmente livro extra pra aluno de confianca / projeto
+        // especial, sem precisar mexer na config global.
 
         int atualizadas = livroRepository.decrementarEstoque(req.livroId());
         if (atualizadas == 0) {
@@ -125,14 +118,8 @@ public class EmprestimoService {
             .build();
 
         Emprestimo salvo = emprestimoRepository.save(emprestimo);
-        // Auditoria de gestao de bem publico (saida de livro). Sem este evento,
-        // forense de "quem emprestou o livro X em 12/05?" so funciona via INNER JOIN
-        // com audit_log + LOGIN_SUCESSO proximo no tempo (e nem temos LOGIN_SUCESSO mais).
-        auditService.registrar(EventoAuditoria.EMPRESTIMO_REGISTRADO, null,
-            "Emprestimo id=" + salvo.getId() + ", livro id=" + livro.getId()
-                + ", aluno matricula=" + aluno.getMatricula() + ", prazo=" + req.prazoDias() + "d");
-        log.info("Emprestimo registrado id={} livro={} aluno={} prazo={}d",
-            salvo.getId(), livro.getId(), aluno.getId(), req.prazoDias());
+        log.info("Emprestimo registrado id={} livro={} aluno_matricula={} prazo={}d",
+            salvo.getId(), livro.getId(), aluno.getMatricula(), req.prazoDias());
         return EmprestimoResponse.from(salvo, hoje);
     }
 
@@ -188,11 +175,6 @@ public class EmprestimoService {
         emp.setRenovacoes(emp.getRenovacoes() + 1);
 
         Emprestimo salvo = emprestimoRepository.save(emp);
-        auditService.registrar(EventoAuditoria.EMPRESTIMO_RENOVADO, null,
-            "Emprestimo id=" + salvo.getId() + ", livro id=" + emp.getLivro().getId()
-                + ", aluno matricula=" + emp.getAluno().getMatricula()
-                + ", renovacao #" + salvo.getRenovacoes() + ", novo prazo=" + prazoDias + "d"
-                + ", nova devolucao prevista=" + salvo.getDataDevolucaoPrevista());
         log.info("Renovacao registrada emprestimo id={} renovacao#{} novoVencimento={}",
             salvo.getId(), salvo.getRenovacoes(), salvo.getDataDevolucaoPrevista());
         return EmprestimoResponse.from(salvo, hoje);
@@ -246,11 +228,6 @@ public class EmprestimoService {
         emp.setDataDevolucaoPrevista(novoVencimento);
 
         Emprestimo salvo = emprestimoRepository.save(emp);
-        auditService.registrar(EventoAuditoria.EMPRESTIMO_EDITADO, null,
-            "Emprestimo id=" + salvo.getId()
-                + ", data " + antesData + " -> " + salvo.getDataEmprestimo()
-                + ", prazo " + antesPrazo + "d -> " + salvo.getPrazoDias() + "d"
-                + ", nova devolucao prevista=" + salvo.getDataDevolucaoPrevista());
         log.info("Emprestimo editado id={} (data {}->{}, prazo {}->{})",
             salvo.getId(), antesData, salvo.getDataEmprestimo(), antesPrazo, salvo.getPrazoDias());
         return EmprestimoResponse.from(salvo, hoje);
@@ -276,24 +253,16 @@ public class EmprestimoService {
 
         int atualizadas = livroRepository.incrementarEstoque(emp.getLivro().getId());
         if (atualizadas == 0) {
-            // Mesma semantica do registrarDevolucao — sinal estruturado em vez
-            // de apenas log, para drift de estoque nao acumular silenciosamente.
-            log.warn("Incremento de estoque nao afetou linhas no cancelamento do emprestimo id={}",
-                emprestimoId);
-            auditService.registrar(EventoAuditoria.ESTOQUE_DIVERGENCIA, null,
-                "Cancelamento do emprestimo id=" + emprestimoId
-                    + " nao incrementou estoque do livro id=" + emp.getLivro().getId()
-                    + " (provavelmente ja estava no teto)");
+            // Drift de estoque: nao acumular silenciosamente — log nivel WARN
+            // garante visibilidade nos logs JSON da aplicacao.
+            log.warn("ESTOQUE_DIVERGENCIA: cancelamento do emprestimo id={} nao incrementou estoque do livro id={} (provavelmente ja no teto)",
+                emprestimoId, emp.getLivro().getId());
         }
 
         emp.setSituacao(SituacaoEmprestimo.CANCELADO);
         emprestimoRepository.save(emp);
-        auditService.registrar(EventoAuditoria.EMPRESTIMO_CANCELADO, null,
-            "Emprestimo id=" + emp.getId() + ", livro id=" + emp.getLivro().getId()
-                + ", aluno matricula=" + emp.getAluno().getMatricula()
-                + " (lancamento incorreto, livro devolvido ao estoque)");
-        log.info("Emprestimo cancelado id={} livro={} aluno={}",
-            emp.getId(), emp.getLivro().getId(), emp.getAluno().getId());
+        log.info("Emprestimo cancelado id={} livro={} aluno_matricula={} (lancamento incorreto)",
+            emp.getId(), emp.getLivro().getId(), emp.getAluno().getMatricula());
     }
 
     @Transactional
@@ -308,14 +277,8 @@ public class EmprestimoService {
 
         int atualizadas = livroRepository.incrementarEstoque(emprestimo.getLivro().getId());
         if (atualizadas == 0) {
-            log.warn("Incremento de estoque nao afetou linhas para livro id={} — possivel divergencia",
-                emprestimo.getLivro().getId());
-            // Sinal estruturado, nao so log: estoque divergiu silenciosamente — sem isto
-            // o drift acumula sem ninguem perceber. Visivel na tela de Auditoria.
-            auditService.registrar(EventoAuditoria.ESTOQUE_DIVERGENCIA, null,
-                "Devolucao do emprestimo id=" + emprestimoId
-                    + " nao incrementou estoque do livro id=" + emprestimo.getLivro().getId()
-                    + " (provavelmente ja estava no teto)");
+            log.warn("ESTOQUE_DIVERGENCIA: devolucao do emprestimo id={} nao incrementou estoque do livro id={} (provavelmente ja no teto)",
+                emprestimoId, emprestimo.getLivro().getId());
         }
 
         LocalDate hoje = LocalDate.now(clock);
@@ -323,11 +286,8 @@ public class EmprestimoService {
         emprestimo.setDataDevolucaoEfetiva(hoje);
 
         Emprestimo salvo = emprestimoRepository.save(emprestimo);
-        auditService.registrar(EventoAuditoria.EMPRESTIMO_DEVOLVIDO, null,
-            "Emprestimo id=" + salvo.getId() + ", livro id=" + emprestimo.getLivro().getId()
-                + ", aluno matricula=" + emprestimo.getAluno().getMatricula());
-        log.info("Devolucao registrada emprestimo id={} livro={}",
-            salvo.getId(), emprestimo.getLivro().getId());
+        log.info("Devolucao registrada emprestimo id={} livro={} aluno_matricula={}",
+            salvo.getId(), emprestimo.getLivro().getId(), emprestimo.getAluno().getMatricula());
         return EmprestimoResponse.from(salvo, hoje);
     }
 

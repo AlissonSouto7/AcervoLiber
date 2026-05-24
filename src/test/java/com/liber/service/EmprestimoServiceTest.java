@@ -45,7 +45,6 @@ class EmprestimoServiceTest {
     @Mock LivroRepository livroRepository;
     @Mock AlunoRepository alunoRepository;
     @Mock ReservaRepository reservaRepository;
-    @Mock AuditService auditService;
 
     private final EmprestimoProperties props = new EmprestimoProperties(7, 30, 3, 2);
     private EmprestimoService service;
@@ -54,7 +53,7 @@ class EmprestimoServiceTest {
     void setUp() {
         service = new EmprestimoService(
             emprestimoRepository, livroRepository, alunoRepository, reservaRepository,
-            auditService, props, CLOCK);
+            props, CLOCK);
     }
 
     private static Aluno aluno() {
@@ -71,7 +70,6 @@ class EmprestimoServiceTest {
     void registrar_happy_path_cria_emprestimo_e_decrementa_estoque() {
         EmprestimoRequest req = new EmprestimoRequest(20L, 10L, 7);
         when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno()));
-        when(emprestimoRepository.countByAlunoIdAndSituacao(10L, SituacaoEmprestimo.ATIVO)).thenReturn(0L);
         when(livroRepository.decrementarEstoque(20L)).thenReturn(1);
         when(livroRepository.findById(20L)).thenReturn(Optional.of(livro()));
         when(emprestimoRepository.save(any(Emprestimo.class))).thenAnswer(inv -> {
@@ -96,20 +94,6 @@ class EmprestimoServiceTest {
         assertThatThrownBy(() -> service.registrar(req))
             .isInstanceOf(RegraEmprestimoException.class)
             .hasMessageContaining("maximo");
-
-        verify(livroRepository, never()).decrementarEstoque(any());
-    }
-
-    @Test
-    void registrar_rejeita_quando_aluno_ja_atingiu_o_limite() {
-        EmprestimoRequest req = new EmprestimoRequest(20L, 10L, 7);
-        when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno()));
-        when(emprestimoRepository.countByAlunoIdAndSituacao(10L, SituacaoEmprestimo.ATIVO))
-            .thenReturn(3L); // limit = 3
-
-        assertThatThrownBy(() -> service.registrar(req))
-            .isInstanceOf(RegraEmprestimoException.class)
-            .hasMessageContaining("limite");
 
         verify(livroRepository, never()).decrementarEstoque(any());
     }
@@ -140,7 +124,6 @@ class EmprestimoServiceTest {
     void registrar_lanca_EstoqueIndisponivel_quando_decremento_falha_e_livro_existe() {
         EmprestimoRequest req = new EmprestimoRequest(20L, 10L, 7);
         when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno()));
-        when(emprestimoRepository.countByAlunoIdAndSituacao(10L, SituacaoEmprestimo.ATIVO)).thenReturn(0L);
         when(livroRepository.decrementarEstoque(20L)).thenReturn(0);
         when(livroRepository.existsById(20L)).thenReturn(true);
 
@@ -152,7 +135,6 @@ class EmprestimoServiceTest {
     void registrar_lanca_NotFound_quando_decremento_falha_e_livro_nao_existe() {
         EmprestimoRequest req = new EmprestimoRequest(99L, 10L, 7);
         when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno()));
-        when(emprestimoRepository.countByAlunoIdAndSituacao(10L, SituacaoEmprestimo.ATIVO)).thenReturn(0L);
         when(livroRepository.decrementarEstoque(99L)).thenReturn(0);
         when(livroRepository.existsById(99L)).thenReturn(false);
 

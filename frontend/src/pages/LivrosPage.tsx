@@ -380,10 +380,12 @@ export default function LivrosPage() {
             </Form.Item>
             <Form.Item
               name="sinopse"
-              label="Sinopse"
-              extra="Opcional. Se vazia, será preenchida automaticamente a partir do Google Books quando disponível."
+              label="Sinopse (opcional)"
+              tooltip="Se vazia, será preenchida automaticamente a partir do Google Books quando disponível."
               rules={[{ max: 2000, message: 'A sinopse deve ter no máximo 2000 caracteres' }]}
             >
+              {/* showCount renderiza o contador absoluto e sobrepunha o texto do `extra`;
+                  movemos a dica pro tooltip do label, mantendo o contador. */}
               <Input.TextArea rows={5} maxLength={2000} showCount placeholder="Breve resumo do livro" />
             </Form.Item>
             <Button type="primary" htmlType="submit" block loading={salvar.isPending}>

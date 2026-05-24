@@ -1,13 +1,12 @@
 package com.liber.security;
 
-import com.liber.entity.EventoAuditoria;
-import com.liber.service.AuditService;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -17,21 +16,19 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
-    private final AuditService auditService;
 
     @Override
     public void handle(HttpServletRequest request,
                        HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {
-        // Registra na trilha: usuario autenticado tentou acessar algo sem permissao.
-        // E sinal forte de probing/insider — sem isto, ALUNO testando endpoints
-        // de gestao passava em silencio. O AuditService captura o ator do
-        // SecurityContext; alvo = path tentado.
-        auditService.registrar(EventoAuditoria.ACESSO_NEGADO, null,
-            request.getMethod() + " " + request.getRequestURI());
+        // Log: usuario autenticado tentou acessar algo sem permissao. E sinal
+        // forte de probing/insider — quem precisar investigar olha os logs JSON
+        // da aplicacao (Logback) por linhas com "Acesso negado".
+        log.warn("Acesso negado: {} {}", request.getMethod(), request.getRequestURI());
 
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(
             HttpStatus.FORBIDDEN,

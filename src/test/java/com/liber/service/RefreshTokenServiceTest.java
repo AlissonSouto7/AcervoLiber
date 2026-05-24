@@ -32,7 +32,6 @@ class RefreshTokenServiceTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-10T12:00:00Z"), ZoneOffset.UTC);
 
     @Mock RefreshTokenRepository repository;
-    @Mock AuditService auditService;
 
     private final JwtProperties props =
         new JwtProperties("test-secret-com-32-bytes-no-minimo-aaaa", 900_000L, REFRESH_MS, "test");
@@ -40,7 +39,7 @@ class RefreshTokenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RefreshTokenService(repository, props, CLOCK, auditService);
+        service = new RefreshTokenService(repository, props, CLOCK);
     }
 
     private static Usuario usuario() {

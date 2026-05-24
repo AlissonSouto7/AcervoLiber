@@ -23,7 +23,6 @@ BEGIN;
 DELETE FROM emprestimos;
 DELETE FROM reservas;
 DELETE FROM refresh_tokens WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'ALUNO');
-DELETE FROM audit_log;
 DELETE FROM livro_capa;
 DELETE FROM livros;
 DELETE FROM usuarios WHERE role = 'ALUNO';

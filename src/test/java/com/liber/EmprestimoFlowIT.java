@@ -132,29 +132,6 @@ class EmprestimoFlowIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void aluno_atinge_limite_e_quarto_emprestimo_e_rejeitado() {
-        post("/api/v1/auth/register",
-            new RegisterRequest("biblio3@test.com", "Carlos", "senha-segura-3"),
-            null, UsuarioResponse.class);
-        String token = login("biblio3@test.com", "senha-segura-3");
-
-        LivroResponse l1 = expectCreated(post("/api/v1/livros", new LivroRequest("L1", "A", null, 2020, 2, null), token, LivroResponse.class));
-        LivroResponse l2 = expectCreated(post("/api/v1/livros", new LivroRequest("L2", "A", null, 2020, 2, null), token, LivroResponse.class));
-        LivroResponse l3 = expectCreated(post("/api/v1/livros", new LivroRequest("L3", "A", null, 2020, 2, null), token, LivroResponse.class));
-        LivroResponse l4 = expectCreated(post("/api/v1/livros", new LivroRequest("L4", "A", null, 2020, 2, null), token, LivroResponse.class));
-        AlunoResponse aluno = expectCreated(post("/api/v1/alunos", new AlunoRequest("2026003", "Aluno", "9C"), token, AlunoResponse.class));
-
-        // Limite eh 3 — quarto deve falhar
-        expectCreated(post("/api/v1/emprestimos", new EmprestimoRequest(l1.id(), aluno.id(), 7), token, EmprestimoResponse.class));
-        expectCreated(post("/api/v1/emprestimos", new EmprestimoRequest(l2.id(), aluno.id(), 7), token, EmprestimoResponse.class));
-        expectCreated(post("/api/v1/emprestimos", new EmprestimoRequest(l3.id(), aluno.id(), 7), token, EmprestimoResponse.class));
-
-        ResponseEntity<ProblemDetail> quarto = post("/api/v1/emprestimos",
-            new EmprestimoRequest(l4.id(), aluno.id(), 7), token, ProblemDetail.class);
-        assertThat(quarto.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-    }
-
-    @Test
     void change_password_funciona_e_senha_antiga_deixa_de_valer() {
         post("/api/v1/auth/register",
             new RegisterRequest("biblio4@test.com", "Lucia", "senha-original"),

@@ -11,35 +11,6 @@ export type StatusUrgencia = 'VERDE' | 'AMARELO' | 'VERMELHO' | 'DEVOLVIDO';
 
 export type StatusReserva = 'PENDENTE' | 'CONFIRMADA' | 'RECUSADA' | 'CANCELADA' | 'EXPIRADA';
 
-export type EventoAuditoria =
-  | 'LOGIN_SUCESSO'     // legado — nao registrado mais, mantido para registros antigos
-  | 'LOGIN_FALHA'
-  | 'LOGIN_BLOQUEADO'
-  | 'LOGOUT'
-  | 'TROCA_SENHA'
-  | 'PERFIL_ATUALIZADO'
-  | 'USUARIO_CRIADO'
-  | 'USUARIO_ATIVADO'
-  | 'USUARIO_DESATIVADO'
-  | 'REFRESH_REUSO'
-  | 'ACESSO_NEGADO'
-  | 'EMPRESTIMO_REGISTRADO'
-  | 'EMPRESTIMO_DEVOLVIDO'
-  | 'ESTOQUE_DIVERGENCIA';
-
-export interface AuditLogResponse {
-  id: number;
-  evento: EventoAuditoria;
-  /** Alvo do evento (login tentado, usuario criado/desativado, etc.). */
-  usuarioEmail: string | null;
-  /** Quem EXECUTOU a acao (capturado do SecurityContext). Nullable em eventos sem auth. */
-  atorEmail: string | null;
-  ip: string | null;
-  userAgent: string | null;
-  detalhe: string | null;
-  ocorridoEm: string;
-}
-
 export interface Usuario {
   id: number;
   email: string;
