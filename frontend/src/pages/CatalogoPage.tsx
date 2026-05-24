@@ -7,7 +7,8 @@ import { mensagemDeErro } from '../api/http';
 import { CapaLivro } from '../components/CapaLivro';
 import type { LivroResponse } from '../types/api';
 
-const TAMANHO_PAGINA = 12;
+const TAMANHO_PAGINA_PADRAO = 12;
+const OPCOES_PAGINA = [12, 24, 48, 96];
 
 /** Catalogo de livros para o aluno — navegar e reservar. */
 export default function CatalogoPage() {
@@ -15,11 +16,12 @@ export default function CatalogoPage() {
   const queryClient = useQueryClient();
   const [termo, setTermo] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(TAMANHO_PAGINA_PADRAO);
   const [detalhe, setDetalhe] = useState<LivroResponse | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['catalogo', termo, page],
-    queryFn: () => listarLivros({ termo, page, size: TAMANHO_PAGINA }),
+    queryKey: ['catalogo', termo, page, pageSize],
+    queryFn: () => listarLivros({ termo, page, size: pageSize }),
   });
 
   // Quantas vagas o aluno ainda tem (limite combinado de emprestimos + reservas).
@@ -91,10 +93,20 @@ export default function CatalogoPage() {
         locale={{ emptyText: 'Nenhum livro encontrado' }}
         pagination={{
           current: page + 1,
-          pageSize: TAMANHO_PAGINA,
+          pageSize,
           total: data?.totalElements ?? 0,
           align: 'center',
-          onChange: (p) => setPage(p - 1),
+          showSizeChanger: true,
+          pageSizeOptions: OPCOES_PAGINA,
+          showTotal: (total) => `${total} livro(s)`,
+          onChange: (p, novoTamanho) => {
+            if (novoTamanho !== pageSize) {
+              setPageSize(novoTamanho);
+              setPage(0);
+            } else {
+              setPage(p - 1);
+            }
+          },
         }}
         renderItem={(livro) => (
           <List.Item>

@@ -50,6 +50,10 @@ public class CapaService {
         "https://www.googleapis.com/books/v1/volumes?country=BR&maxResults=5&q=";
     private static final String OPEN_LIBRARY_COVER_URL =
         "https://covers.openlibrary.org/b/isbn/%s-L.jpg?default=false";
+    private static final String OPEN_LIBRARY_SEARCH_URL =
+        "https://openlibrary.org/search.json?limit=3&";
+    private static final String OPEN_LIBRARY_COVER_BY_ID_URL =
+        "https://covers.openlibrary.org/b/id/%d-L.jpg?default=false";
 
     /**
      * Hosts cuja resposta de capa o servidor aceita persistir em {@code livros.capa_url}.
@@ -182,6 +186,21 @@ public class CapaService {
             }
         }
 
+        // 4) Open Library por titulo + autor — cobre edicoes nacionais quando o ISBN
+        // do nosso cadastro nao bate com nenhuma edicao indexada. Sem chave de API.
+        if (temTexto(titulo)) {
+            try {
+                String url = consultarOpenLibraryTitulo(titulo, autor);
+                if (url != null) {
+                    cache.put(chave, url);
+                    return url;
+                }
+            } catch (Exception e) {
+                log.warn("Open Library (titulo '{}') falhou: {}", titulo, e.toString());
+                erroTransitorio = true;
+            }
+        }
+
         // Nada encontrado: cacheia o negativo so se nao houve erro transitorio
         // (assim um 429/timeout permite nova tentativa no proximo backfill).
         if (!erroTransitorio) {
@@ -306,6 +325,55 @@ public class CapaService {
         }
         String t = descricao.trim();
         return t.length() > 2000 ? t.substring(0, 2000) : t;
+    }
+
+    /**
+     * Consulta a Open Library Search API por titulo (e autor, se houver),
+     * retorna a primeira capa que existir entre os 3 primeiros resultados.
+     * Como a URL https://covers.openlibrary.org/b/id/{id}-L.jpg sem
+     * {@code ?default=false} devolve 200 mesmo quando nao tem imagem (um GIF
+     * de 1x1), forcamos {@code ?default=false} para receber 404 nesses casos.
+     */
+    private String consultarOpenLibraryTitulo(String titulo, String autor) throws Exception {
+        StringBuilder query = new StringBuilder();
+        query.append("title=").append(URLEncoder.encode(titulo, StandardCharsets.UTF_8));
+        if (temTexto(autor)) {
+            query.append("&author=").append(URLEncoder.encode(autor, StandardCharsets.UTF_8));
+        }
+        String url = OPEN_LIBRARY_SEARCH_URL + query;
+
+        HttpResponse<String> resp = httpClient.send(
+            HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(6))
+                .header("Accept", "application/json")
+                .GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        if (resp.statusCode() != 200) {
+            throw new IllegalStateException("Open Library search HTTP " + resp.statusCode());
+        }
+        OpenLibrarySearchResponse dados = objectMapper.readValue(
+            resp.body(), OpenLibrarySearchResponse.class);
+        if (dados.docs() == null) {
+            return null;
+        }
+        // Tenta cada doc em ordem ate achar uma capa que retorne 200 com default=false
+        for (OpenLibrarySearchResponse.Doc doc : dados.docs()) {
+            Long coverId = doc.coverI();
+            if (coverId == null || coverId <= 0) {
+                continue;
+            }
+            String coverUrl = OPEN_LIBRARY_COVER_BY_ID_URL.formatted(coverId);
+            HttpResponse<Void> check = httpClient.send(
+                HttpRequest.newBuilder(URI.create(coverUrl))
+                    .timeout(Duration.ofSeconds(4))
+                    .GET().build(),
+                HttpResponse.BodyHandlers.discarding());
+            if (check.statusCode() == 200) {
+                return urlSegura(coverUrl);
+            }
+        }
+        return null;
     }
 
     /**
@@ -445,5 +513,14 @@ public class CapaService {
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         record ImageLinks(String thumbnail, String smallThumbnail) {}
+    }
+
+    // --- Open Library Search API: precisa mapear cover_i (snake_case do JSON) ---
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record OpenLibrarySearchResponse(List<Doc> docs) {
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        record Doc(@com.fasterxml.jackson.annotation.JsonProperty("cover_i") Long coverI) {}
     }
 }

@@ -31,7 +31,8 @@ import { CapaLivro } from '../components/CapaLivro';
 import { CapaPreview } from '../components/CapaPreview';
 import type { LivroResponse } from '../types/api';
 
-const TAMANHO_PAGINA = 12;
+const TAMANHO_PAGINA_PADRAO = 12;
+const OPCOES_PAGINA = [12, 24, 48, 96];
 
 /** Formatos e tamanho aceitos no upload de capa (espelha a validacao do backend). */
 const TIPOS_IMAGEM = ['image/png', 'image/jpeg', 'image/webp'];
@@ -54,6 +55,7 @@ export default function LivrosPage() {
 
   const [termo, setTermo] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(TAMANHO_PAGINA_PADRAO);
   const [drawerAberto, setDrawerAberto] = useState(false);
   const [editando, setEditando] = useState<LivroResponse | null>(null);
   /** Imagem de capa escolhida no formulario — enviada apos salvar o livro. */
@@ -78,8 +80,8 @@ export default function LivrosPage() {
   }, [capaArquivoPreview]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['livros', termo, page],
-    queryFn: () => listarLivros({ termo, page, size: TAMANHO_PAGINA }),
+    queryKey: ['livros', termo, page, pageSize],
+    queryFn: () => listarLivros({ termo, page, size: pageSize }),
   });
 
   const salvar = useMutation({
@@ -202,10 +204,23 @@ export default function LivrosPage() {
         locale={{ emptyText: 'Nenhum livro encontrado' }}
         pagination={{
           current: page + 1,
-          pageSize: TAMANHO_PAGINA,
+          pageSize,
           total: data?.totalElements ?? 0,
           align: 'center',
-          onChange: (p) => setPage(p - 1),
+          showSizeChanger: true,
+          pageSizeOptions: OPCOES_PAGINA,
+          showTotal: (total) => `${total} livro(s)`,
+          onChange: (p, novoTamanho) => {
+            // AntD chama onChange com o novo pageSize quando o usuario muda
+            // o seletor, mas mantem o pageSize antigo no proximo render se nao
+            // atualizarmos o state — por isso setamos os dois aqui.
+            if (novoTamanho !== pageSize) {
+              setPageSize(novoTamanho);
+              setPage(0);
+            } else {
+              setPage(p - 1);
+            }
+          },
         }}
         renderItem={(livro) => (
           <List.Item>
