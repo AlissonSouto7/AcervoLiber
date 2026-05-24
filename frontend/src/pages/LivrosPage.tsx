@@ -41,9 +41,9 @@ const TAMANHO_MAX_CAPA = 2 * 1024 * 1024;
 function tagDisponibilidade(livro: LivroResponse) {
   const disp = livro.quantidadeDisponivel;
   if (disp > 0) {
-    return <Tag color="green">{disp} de {livro.quantidadeExemplares} disponiveis</Tag>;
+    return <Tag color="green">{disp} de {livro.quantidadeExemplares} disponíveis</Tag>;
   }
-  return <Tag color="red">Indisponivel no momento</Tag>;
+  return <Tag color="red">Indisponível no momento</Tag>;
 }
 
 export default function LivrosPage() {
@@ -114,7 +114,7 @@ export default function LivrosPage() {
   const restaurarCapaAutomatica = useMutation({
     mutationFn: (id: number) => removerCapaManual(id),
     onSuccess: () => {
-      message.success('Capa automatica restaurada');
+      message.success('Capa automática restaurada');
       queryClient.invalidateQueries({ queryKey: ['livros'] });
       fecharDrawer();
     },
@@ -142,11 +142,11 @@ export default function LivrosPage() {
   /** Valida o arquivo escolhido e o guarda; nao faz upload aqui (so ao salvar). */
   function selecionarCapa(arquivo: File) {
     if (!TIPOS_IMAGEM.includes(arquivo.type)) {
-      message.error('Formato invalido. Envie uma imagem JPG, PNG ou WEBP.');
+      message.error('Formato inválido. Envie uma imagem JPG, PNG ou WEBP.');
       return Upload.LIST_IGNORE;
     }
     if (arquivo.size > TAMANHO_MAX_CAPA) {
-      message.error('Imagem muito grande. O tamanho maximo e 2 MB.');
+      message.error('Imagem muito grande. O tamanho máximo é 2 MB.');
       return Upload.LIST_IGNORE;
     }
     setCapaArquivo(arquivo);
@@ -180,7 +180,7 @@ export default function LivrosPage() {
         </Typography.Title>
         <Space wrap style={{ flex: isMobile ? '1 1 100%' : undefined }}>
           <Input.Search
-            placeholder="Buscar por titulo, autor ou ISBN"
+            placeholder="Buscar por título, autor ou ISBN"
             allowClear
             onSearch={(v) => {
               setTermo(v);
@@ -218,7 +218,7 @@ export default function LivrosPage() {
                 <Popconfirm
                   key="remover"
                   title="Remover este livro?"
-                  description="So e possivel remover livros sem historico de emprestimos."
+                  description="Só é possível remover livros sem histórico de empréstimos."
                   okText="Remover"
                   cancelText="Cancelar"
                   okButtonProps={{ danger: true }}
@@ -261,8 +261,8 @@ export default function LivrosPage() {
           >
             <Form.Item
               name="titulo"
-              label="Titulo"
-              rules={[{ required: true, message: 'Informe o titulo' }]}
+              label="Título"
+              rules={[{ required: true, message: 'Informe o título' }]}
             >
               <Input />
             </Form.Item>
@@ -290,14 +290,14 @@ export default function LivrosPage() {
                   <>
                     <div style={{ width: 130 }}>
                       <CapaLivro
-                        titulo={tituloDigitado?.trim() || 'Titulo do livro'}
+                        titulo={tituloDigitado?.trim() || 'Título do livro'}
                         autor={autorDigitado?.trim() || undefined}
                         capaUrl={capaArquivoPreview}
                         altura={190}
                       />
                     </div>
                     <Typography.Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>
-                      Imagem escolhida — sera salva junto com o livro
+                      Imagem escolhida — será salva junto com o livro
                     </Typography.Text>
                   </>
                 ) : editando ? (
@@ -329,7 +329,7 @@ export default function LivrosPage() {
                     beforeUpload={selecionarCapa}
                   >
                     <Button icon={<UploadOutlined />} size="small">
-                      {capaArquivo ? 'Trocar imagem' : 'Enviar imagem propria'}
+                      {capaArquivo ? 'Trocar imagem' : 'Enviar imagem própria'}
                     </Button>
                   </Upload>
                   {capaArquivo && (
@@ -346,13 +346,13 @@ export default function LivrosPage() {
                     loading={restaurarCapaAutomatica.isPending}
                     onClick={() => restaurarCapaAutomatica.mutate(editando.id)}
                   >
-                    Voltar para a capa automatica
+                    Voltar para a capa automática
                   </Button>
                 )}
               </div>
             </Form.Item>
 
-            <Form.Item name="ano" label="Ano de publicacao">
+            <Form.Item name="ano" label="Ano de publicação">
               <InputNumber style={{ width: '100%' }} min={1000} max={9999} placeholder="Opcional" />
             </Form.Item>
             <Form.Item

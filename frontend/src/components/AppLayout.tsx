@@ -28,20 +28,20 @@ const ITENS_STAFF = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
   { key: '/livros', icon: <BookOutlined />, label: 'Livros' },
   { key: '/alunos', icon: <TeamOutlined />, label: 'Alunos' },
-  { key: '/emprestimos', icon: <SwapOutlined />, label: 'Emprestimos' },
+  { key: '/emprestimos', icon: <SwapOutlined />, label: 'Empréstimos' },
   { key: '/reservas', icon: <CarryOutOutlined />, label: 'Reservas' },
-  { key: '/historico', icon: <HistoryOutlined />, label: 'Historico' },
+  { key: '/historico', icon: <HistoryOutlined />, label: 'Histórico' },
 ];
 
 // Itens visiveis apenas para ADMIN
 const ITENS_ADMIN = [
-  { key: '/usuarios', icon: <IdcardOutlined />, label: 'Usuarios' },
+  { key: '/usuarios', icon: <IdcardOutlined />, label: 'Usuários' },
   { key: '/auditoria', icon: <AuditOutlined />, label: 'Auditoria' },
 ];
 
 // Itens do aluno
 const ITENS_ALUNO = [
-  { key: '/catalogo', icon: <ReadOutlined />, label: 'Catalogo' },
+  { key: '/catalogo', icon: <ReadOutlined />, label: 'Catálogo' },
   { key: '/minhas-reservas', icon: <CarryOutOutlined />, label: 'Minhas reservas' },
 ];
 
@@ -133,7 +133,7 @@ export function AppLayout() {
     {
       key: 'configuracoes',
       icon: <SettingOutlined />,
-      label: 'Configuracoes',
+      label: 'Configurações',
       onClick: () => navigate('/configuracoes'),
     },
     { type: 'divider' },

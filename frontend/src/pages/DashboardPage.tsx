@@ -33,7 +33,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} md={6}>
           <Card>
-            <Statistic title="Emprestimos ativos" value={data.totais.emprestimosAtivos} />
+            <Statistic title="Empréstimos ativos" value={data.totais.emprestimosAtivos} />
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -55,27 +55,27 @@ export default function DashboardPage() {
           scroll={{ x: 'max-content' }}
           locale={{ emptyText: 'Sem dados ainda' }}
           columns={[
-            { title: 'Titulo', dataIndex: 'titulo' },
+            { title: 'Título', dataIndex: 'titulo' },
             { title: 'Autor', dataIndex: 'autor' },
-            { title: 'Emprestimos', dataIndex: 'totalEmprestimos', width: 140 },
+            { title: 'Empréstimos', dataIndex: 'totalEmprestimos', width: 140 },
           ]}
         />
       </Card>
 
-      <Card title="Devolucoes atrasadas" style={{ marginTop: 16 }}>
+      <Card title="Devoluções atrasadas" style={{ marginTop: 16 }}>
         <Table<DashboardAlertaDTO>
           rowKey="emprestimoId"
           dataSource={data.alertasAtrasados}
           pagination={false}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Nenhum emprestimo atrasado' }}
+          locale={{ emptyText: 'Nenhum empréstimo atrasado' }}
           columns={[
             { title: 'Livro', dataIndex: 'livroTitulo' },
             { title: 'Aluno', dataIndex: 'alunoNome' },
             // Matricula mascarada (Fase 7 — reduz exposicao de identificador
             // unico de menor quando a tela fica visivel a terceiros).
-            { title: 'Matricula', dataIndex: 'alunoMatriculaMascarada', width: 130 },
-            { title: 'Devolucao prevista', dataIndex: 'dataDevolucaoPrevista', width: 180 },
+            { title: 'Matrícula', dataIndex: 'alunoMatriculaMascarada', width: 130 },
+            { title: 'Devolução prevista', dataIndex: 'dataDevolucaoPrevista', width: 180 },
           ]}
         />
       </Card>

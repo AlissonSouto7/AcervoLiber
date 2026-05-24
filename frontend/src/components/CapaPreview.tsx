@@ -56,7 +56,7 @@ export function CapaPreview({ isbn, titulo, autor }: CapaPreviewProps) {
 
   let legenda: React.ReactNode;
   if (!podeBuscar) {
-    legenda = 'Preencha o titulo ou o ISBN para buscar a capa';
+    legenda = 'Preencha o título ou o ISBN para buscar a capa';
   } else if (isFetching) {
     legenda = (
       <>
@@ -66,14 +66,14 @@ export function CapaPreview({ isbn, titulo, autor }: CapaPreviewProps) {
   } else if (capaUrl) {
     legenda = 'Capa encontrada automaticamente';
   } else {
-    legenda = 'Sem capa automatica — sera usada a capa gerada';
+    legenda = 'Sem capa automática — será usada a capa gerada';
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 130 }}>
         <CapaLivro
-          titulo={titulo?.trim() || 'Titulo do livro'}
+          titulo={titulo?.trim() || 'Título do livro'}
           autor={autor?.trim() || undefined}
           capaUrl={podeBuscar ? capaUrl : null}
           altura={190}

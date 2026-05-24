@@ -17,6 +17,10 @@ export default function ConfiguracoesPage() {
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
 
+  // Aluno nao pode editar o nome (e o nome oficial cadastrado pela escola).
+  // So o bibliotecario pode mudar via tela de Alunos.
+  const ehAluno = usuario?.role === 'ALUNO';
+
   async function salvarPerfil(values: { nome: string }) {
     setSalvandoPerfil(true);
     try {
@@ -51,7 +55,7 @@ export default function ConfiguracoesPage() {
 
   return (
     <>
-      <Typography.Title level={3}>Configuracoes</Typography.Title>
+      <Typography.Title level={3}>Configurações</Typography.Title>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
         <Card title="Dados da conta" style={{ flex: '1 1 360px', maxWidth: 480 }}>
           <Form
@@ -67,12 +71,15 @@ export default function ConfiguracoesPage() {
               name="nome"
               label="Nome"
               rules={[{ required: true, message: 'Informe o nome' }]}
+              extra={ehAluno ? 'Nome oficial cadastrado pela escola — para corrigir, procure o bibliotecario(a).' : undefined}
             >
-              <Input />
+              <Input disabled={ehAluno} />
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={salvandoPerfil}>
-              Salvar dados
-            </Button>
+            {!ehAluno && (
+              <Button type="primary" htmlType="submit" loading={salvandoPerfil}>
+                Salvar dados
+              </Button>
+            )}
           </Form>
         </Card>
 
@@ -105,7 +112,7 @@ export default function ConfiguracoesPage() {
                   validator(_, value) {
                     return !value || value === getFieldValue('senhaNova')
                       ? Promise.resolve()
-                      : Promise.reject(new Error('As senhas nao conferem'));
+                      : Promise.reject(new Error('As senhas não conferem'));
                   },
                 }),
               ]}

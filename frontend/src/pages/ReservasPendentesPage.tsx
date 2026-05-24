@@ -61,7 +61,7 @@ export default function ReservasPendentesPage() {
   const confirmar = useMutation({
     mutationFn: ({ id, prazo }: { id: number; prazo: number }) => confirmarReserva(id, prazo),
     onSuccess: () => {
-      message.success('Reserva confirmada — emprestimo registrado.');
+      message.success('Reserva confirmada — empréstimo registrado.');
       setConfirmando(null);
       invalidarTudo();
     },
@@ -128,7 +128,7 @@ export default function ReservasPendentesPage() {
     },
     { title: 'Reservado em', key: 'res', width: 140, render: (_, r) => formatarData(r.dataReserva) },
     { title: 'Validade', key: 'val', width: 140, render: (_, r) => formatarData(r.dataExpiracao) },
-    { title: 'Acoes', key: 'acoes', width: 200, render: (_, r) => acoes(r) },
+    { title: 'Ações', key: 'acoes', width: 200, render: (_, r) => acoes(r) },
   ];
 
   const reservas = data?.content ?? [];
@@ -138,7 +138,7 @@ export default function ReservasPendentesPage() {
     <>
       <Typography.Title level={3}>Reservas pendentes</Typography.Title>
       <Typography.Paragraph type="secondary">
-        Confirme para transformar a reserva em emprestimo, ou recuse para devolver o exemplar ao
+        Confirme para transformar a reserva em empréstimo, ou recuse para devolver o exemplar ao
         acervo.
       </Typography.Paragraph>
 
@@ -189,7 +189,7 @@ export default function ReservasPendentesPage() {
         open={confirmando !== null}
         onCancel={() => setConfirmando(null)}
         confirmLoading={confirmar.isPending}
-        okText="Confirmar emprestimo"
+        okText="Confirmar empréstimo"
         cancelText="Cancelar"
         onOk={() => {
           if (confirmando) confirmar.mutate({ id: confirmando.id, prazo: prazoDias });
@@ -203,7 +203,7 @@ export default function ReservasPendentesPage() {
             <Typography.Paragraph type="secondary">
               Aluno: {confirmando.aluno.nome} ({confirmando.aluno.matricula})
             </Typography.Paragraph>
-            <Typography.Text>Prazo de emprestimo (dias):</Typography.Text>
+            <Typography.Text>Prazo de empréstimo (dias):</Typography.Text>
             <div style={{ marginTop: 8 }}>
               <InputNumber
                 min={1}

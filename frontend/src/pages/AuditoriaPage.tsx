@@ -14,13 +14,13 @@ const EVENTO_INFO: Record<EventoAuditoria, { cor: string; texto: string }> = {
   LOGOUT: { cor: 'default', texto: 'Logout' },
   TROCA_SENHA: { cor: 'blue', texto: 'Troca de senha' },
   PERFIL_ATUALIZADO: { cor: 'geekblue', texto: 'Perfil atualizado' },
-  USUARIO_CRIADO: { cor: 'green', texto: 'Usuario criado' },
-  USUARIO_ATIVADO: { cor: 'cyan', texto: 'Usuario ativado' },
-  USUARIO_DESATIVADO: { cor: 'orange', texto: 'Usuario desativado' },
+  USUARIO_CRIADO: { cor: 'green', texto: 'Usuário criado' },
+  USUARIO_ATIVADO: { cor: 'cyan', texto: 'Usuário ativado' },
+  USUARIO_DESATIVADO: { cor: 'orange', texto: 'Usuário desativado' },
   REFRESH_REUSO: { cor: 'magenta', texto: 'Reuso de refresh (suspeita de roubo)' },
   ACESSO_NEGADO: { cor: 'red', texto: 'Acesso negado' },
-  EMPRESTIMO_REGISTRADO: { cor: 'blue', texto: 'Emprestimo registrado' },
-  EMPRESTIMO_DEVOLVIDO: { cor: 'cyan', texto: 'Emprestimo devolvido' },
+  EMPRESTIMO_REGISTRADO: { cor: 'blue', texto: 'Empréstimo registrado' },
+  EMPRESTIMO_DEVOLVIDO: { cor: 'cyan', texto: 'Empréstimo devolvido' },
   ESTOQUE_DIVERGENCIA: { cor: 'volcano', texto: 'Estoque divergente' },
 };
 

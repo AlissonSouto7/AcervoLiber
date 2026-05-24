@@ -64,13 +64,13 @@ export default function PrimeiroAcessoPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Por seguranca, troque a senha provisoria antes de continuar."
+          message="Por segurança, troque a senha provisória antes de continuar."
         />
         <Form<FormValues> layout="vertical" size="large" onFinish={aoEnviar} disabled={carregando}>
           <Form.Item
             name="senhaAtual"
-            label="Senha provisoria"
-            rules={[{ required: true, message: 'Informe a senha provisoria' }]}
+            label="Senha provisória"
+            rules={[{ required: true, message: 'Informe a senha provisória' }]}
           >
             <Input.Password autoComplete="current-password" />
           </Form.Item>
@@ -94,7 +94,7 @@ export default function PrimeiroAcessoPage() {
                 validator(_, value) {
                   return !value || value === getFieldValue('senhaNova')
                     ? Promise.resolve()
-                    : Promise.reject(new Error('As senhas nao conferem'));
+                    : Promise.reject(new Error('As senhas não conferem'));
                 },
               }),
             ]}

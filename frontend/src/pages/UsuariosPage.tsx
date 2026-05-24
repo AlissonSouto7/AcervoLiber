@@ -52,7 +52,7 @@ export default function UsuariosPage() {
   const criar = useMutation({
     mutationFn: (payload: CriarUsuarioPayload) => criarUsuario(payload),
     onSuccess: () => {
-      message.success('Usuario criado');
+      message.success('Usuário criado');
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       setDrawerAberto(false);
     },
@@ -86,7 +86,7 @@ export default function UsuariosPage() {
     return u.ativo ? (
       <Popconfirm
         title={`Desativar ${u.nome}?`}
-        description="Todas as sessoes ativas dele serao encerradas imediatamente."
+        description="Todas as sessões ativas dele serão encerradas imediatamente."
         okText="Desativar"
         okButtonProps={{ danger: true }}
         cancelText="Cancelar"
@@ -127,10 +127,10 @@ export default function UsuariosPage() {
         }}
       >
         <Typography.Title level={3} style={{ margin: 0 }}>
-          Usuarios
+          Usuários
         </Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerAberto(true)}>
-          Novo usuario
+          Novo usuário
         </Button>
       </div>
 
@@ -138,7 +138,7 @@ export default function UsuariosPage() {
         <List
           loading={isLoading}
           dataSource={data?.content ?? []}
-          locale={{ emptyText: 'Nenhum usuario' }}
+          locale={{ emptyText: 'Nenhum usuário' }}
           pagination={paginacao}
           renderItem={(u) => (
             <Card size="small" style={{ marginBottom: 12 }}>
@@ -162,13 +162,13 @@ export default function UsuariosPage() {
           columns={colunas}
           dataSource={data?.content ?? []}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Nenhum usuario' }}
+          locale={{ emptyText: 'Nenhum usuário' }}
           pagination={paginacao}
         />
       )}
 
       <Drawer
-        title="Novo usuario"
+        title="Novo usuário"
         open={drawerAberto}
         onClose={() => setDrawerAberto(false)}
         width={isMobile ? '100%' : 420}
@@ -191,7 +191,7 @@ export default function UsuariosPage() {
               label="E-mail"
               rules={[
                 { required: true, message: 'Informe o e-mail' },
-                { type: 'email', message: 'E-mail invalido' },
+                { type: 'email', message: 'E-mail inválido' },
               ]}
             >
               <Input />
@@ -213,13 +213,13 @@ export default function UsuariosPage() {
             >
               <Select
                 options={[
-                  { value: 'BIBLIOTECARIO', label: 'Bibliotecario' },
+                  { value: 'BIBLIOTECARIO', label: 'Bibliotecário' },
                   { value: 'ADMIN', label: 'Administrador' },
                 ]}
               />
             </Form.Item>
             <Button type="primary" htmlType="submit" block loading={criar.isPending}>
-              Criar usuario
+              Criar usuário
             </Button>
           </Form>
         )}

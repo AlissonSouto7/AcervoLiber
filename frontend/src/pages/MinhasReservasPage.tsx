@@ -72,7 +72,7 @@ export default function MinhasReservasPage() {
     { title: 'Status', key: 'status', width: 190, render: (_, r) => tagStatus(r.status) },
     { title: 'Reservado em', key: 'res', width: 140, render: (_, r) => formatarData(r.dataReserva) },
     { title: 'Validade', key: 'val', width: 140, render: (_, r) => formatarData(r.dataExpiracao) },
-    { title: 'Acoes', key: 'acoes', width: 120, render: (_, r) => botaoCancelar(r) },
+    { title: 'Ações', key: 'acoes', width: 120, render: (_, r) => botaoCancelar(r) },
   ];
 
   return (
@@ -83,7 +83,7 @@ export default function MinhasReservasPage() {
         <List
           loading={isLoading}
           dataSource={data?.content ?? []}
-          locale={{ emptyText: 'Voce ainda nao tem reservas' }}
+          locale={{ emptyText: 'Você ainda não tem reservas' }}
           pagination={paginacao}
           renderItem={(reserva) => (
             <Card size="small" style={{ marginBottom: 12 }}>
@@ -108,7 +108,7 @@ export default function MinhasReservasPage() {
           columns={colunas}
           dataSource={data?.content ?? []}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Voce ainda nao tem reservas' }}
+          locale={{ emptyText: 'Você ainda não tem reservas' }}
           pagination={paginacao}
         />
       )}

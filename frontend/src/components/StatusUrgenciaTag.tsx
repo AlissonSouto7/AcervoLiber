@@ -3,7 +3,7 @@ import type { StatusUrgencia } from '../types/api';
 
 const CONFIG: Record<StatusUrgencia, { cor: string; texto: string }> = {
   VERDE: { cor: 'green', texto: 'Em dia' },
-  AMARELO: { cor: 'gold', texto: 'Devolucao proxima' },
+  AMARELO: { cor: 'gold', texto: 'Devolução próxima' },
   VERMELHO: { cor: 'red', texto: 'Atrasado' },
   DEVOLVIDO: { cor: 'default', texto: 'Devolvido' },
 };

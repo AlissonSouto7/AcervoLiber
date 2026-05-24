@@ -54,10 +54,10 @@ export default function CatalogoPage() {
         }}
       >
         <Typography.Title level={3} style={{ margin: 0 }}>
-          Catalogo
+          Catálogo
         </Typography.Title>
         <Input.Search
-          placeholder="Buscar por titulo, autor ou ISBN"
+          placeholder="Buscar por título, autor ou ISBN"
           allowClear
           onSearch={(v) => {
             setTermo(v);
@@ -74,9 +74,9 @@ export default function CatalogoPage() {
           showIcon
           message={
             semVagas
-              ? `Voce atingiu o limite de ${resumo.limite} livros entre emprestimos e reservas.`
-              : `Voce tem ${disponivel} de ${resumo.limite} vagas disponiveis ` +
-                `(${resumo.emprestimosAtivos} emprestimo(s) e ${resumo.reservasPendentes} reserva(s)).`
+              ? `Você atingiu o limite de ${resumo.limite} livros entre empréstimos e reservas.`
+              : `Você tem ${disponivel} de ${resumo.limite} vagas disponíveis ` +
+                `(${resumo.emprestimosAtivos} empréstimo(s) e ${resumo.reservasPendentes} reserva(s)).`
           }
         />
       )}
@@ -125,7 +125,7 @@ export default function CatalogoPage() {
                 </Button>
               ) : (
                 <Tag color="red" style={{ width: '100%', textAlign: 'center', marginInlineEnd: 0 }}>
-                  Indisponivel
+                  Indisponível
                 </Tag>
               )}
             </Card>

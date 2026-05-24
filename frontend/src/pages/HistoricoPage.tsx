@@ -30,13 +30,13 @@ export default function HistoricoPage() {
     { title: 'Livro', dataIndex: ['livro', 'titulo'] },
     { title: 'Aluno', dataIndex: ['aluno', 'nome'] },
     {
-      title: 'Emprestimo',
+      title: 'Empréstimo',
       key: 'de',
       width: 120,
       render: (_, e) => formatarData(e.dataEmprestimo),
     },
     {
-      title: 'Devolucao prevista',
+      title: 'Devolução prevista',
       key: 'prev',
       width: 160,
       render: (_, e) => formatarData(e.dataDevolucaoPrevista),
@@ -47,7 +47,7 @@ export default function HistoricoPage() {
       width: 130,
       render: (_, e) => formatarData(e.dataDevolucaoEfetiva),
     },
-    { title: 'Situacao', key: 'sit', width: 110, render: (_, e) => tagSituacao(e) },
+    { title: 'Situação', key: 'sit', width: 110, render: (_, e) => tagSituacao(e) },
     {
       title: 'Status',
       key: 'status',
@@ -65,13 +65,13 @@ export default function HistoricoPage() {
 
   return (
     <>
-      <Typography.Title level={3}>Historico de emprestimos</Typography.Title>
+      <Typography.Title level={3}>Histórico de empréstimos</Typography.Title>
 
       {isMobile ? (
         <List
           loading={isLoading}
           dataSource={data?.content ?? []}
-          locale={{ emptyText: 'Nenhum emprestimo no historico' }}
+          locale={{ emptyText: 'Nenhum empréstimo no histórico' }}
           pagination={paginacao}
           renderItem={(emp) => (
             <Card size="small" style={{ marginBottom: 12 }}>
@@ -103,7 +103,7 @@ export default function HistoricoPage() {
           columns={colunas}
           dataSource={data?.content ?? []}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Nenhum emprestimo no historico' }}
+          locale={{ emptyText: 'Nenhum empréstimo no histórico' }}
           pagination={paginacao}
         />
       )}

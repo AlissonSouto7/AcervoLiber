@@ -23,7 +23,7 @@ export default function LoginPage() {
       setSessao(resp);
       navigate('/');
     } catch (erro) {
-      message.error(mensagemDeErro(erro, 'Nao foi possivel entrar'));
+      message.error(mensagemDeErro(erro, 'Não foi possível entrar'));
     } finally {
       setCarregando(false);
     }
@@ -36,7 +36,7 @@ export default function LoginPage() {
     confirmacao: string;
   }) {
     if (v.senha !== v.confirmacao) {
-      message.error('As senhas nao conferem.');
+      message.error('As senhas não conferem.');
       return;
     }
     setCarregando(true);
@@ -46,7 +46,7 @@ export default function LoginPage() {
       // Auto-login com a senha que o aluno acabou de definir.
       await entrar(loginAluno(v.matricula.trim(), v.senha));
     } catch (erro) {
-      message.error(mensagemDeErro(erro, 'Nao foi possivel cadastrar'));
+      message.error(mensagemDeErro(erro, 'Não foi possível cadastrar'));
       setCarregando(false);
     }
   }
@@ -61,10 +61,10 @@ export default function LoginPage() {
     >
       <Form.Item
         name="matricula"
-        label="Matricula"
-        rules={[{ required: true, message: 'Informe sua matricula' }]}
+        label="Matrícula"
+        rules={[{ required: true, message: 'Informe sua matrícula' }]}
       >
-        <Input prefix={<IdcardOutlined />} placeholder="Sua matricula" autoComplete="username" />
+        <Input prefix={<IdcardOutlined />} placeholder="Sua matrícula" autoComplete="username" />
       </Form.Item>
       <Form.Item name="senha" label="Senha" rules={[{ required: true, message: 'Informe a senha' }]}>
         <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
@@ -87,13 +87,13 @@ export default function LoginPage() {
   const formAlunoCadastro = (
     <Form layout="vertical" size="large" disabled={carregando} onFinish={cadastrarAluno}>
       <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
-        Use a <strong>matricula</strong> e o <strong>nome completo</strong> conforme cadastrados pela
-        escola. Se os dados nao conferirem, procure o(a) bibliotecario(a).
+        Use a <strong>matrícula</strong> e o <strong>nome completo</strong> conforme cadastrados pela
+        escola. Se os dados não conferirem, procure o(a) bibliotecário(a).
       </Typography.Paragraph>
       <Form.Item
         name="matricula"
-        label="Matricula"
-        rules={[{ required: true, message: 'Informe sua matricula' }]}
+        label="Matrícula"
+        rules={[{ required: true, message: 'Informe sua matrícula' }]}
       >
         <Input prefix={<IdcardOutlined />} placeholder="Ex: 2026001" autoComplete="off" />
       </Form.Item>
@@ -112,9 +112,9 @@ export default function LoginPage() {
         label="Senha"
         rules={[
           { required: true, message: 'Informe uma senha' },
-          { min: 8, message: 'Minimo 8 caracteres' },
+          { min: 8, message: 'Mínimo 8 caracteres' },
         ]}
-        extra="Min. 8 caracteres com letras e numeros."
+        extra="Mín. 8 caracteres com letras e números."
       >
         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
       </Form.Item>
@@ -134,7 +134,7 @@ export default function LoginPage() {
         style={{ marginTop: 8 }}
         onClick={() => setModoAluno('login')}
       >
-        Ja tem cadastro? Fazer login
+        Já tem cadastro? Fazer login
       </Button>
     </Form>
   );
@@ -151,10 +151,10 @@ export default function LoginPage() {
         label="E-mail"
         rules={[
           { required: true, message: 'Informe o e-mail' },
-          { type: 'email', message: 'E-mail invalido' },
+          { type: 'email', message: 'E-mail inválido' },
         ]}
       >
-        <Input prefix={<UserOutlined />} placeholder="voce@escola.com" autoComplete="username" />
+        <Input prefix={<UserOutlined />} placeholder="você@escola.com" autoComplete="username" />
       </Form.Item>
       <Form.Item name="senha" label="Senha" rules={[{ required: true, message: 'Informe a senha' }]}>
         <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />

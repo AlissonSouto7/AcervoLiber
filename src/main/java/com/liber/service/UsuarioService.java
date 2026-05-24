@@ -83,6 +83,14 @@ public class UsuarioService {
     public UsuarioResponse atualizarPerfil(String email, String nome) {
         Usuario usuario = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado: " + email));
+        // Aluno NAO pode mudar nome — e o nome oficial cadastrado pela escola.
+        // Bibliotecario edita via tela de Alunos quando precisa corrigir.
+        // Sem este bloqueio, o aluno mudava Usuario.nome mas Aluno.nome (o que aparece
+        // na tela do bibliotecario) ficava intocado, causando dessincronia confusa.
+        if (usuario.getRole() == Role.ALUNO) {
+            throw new BusinessException(
+                "Alunos nao podem alterar o nome. Procure o bibliotecario(a) se houver erro de cadastro.");
+        }
         usuario.setNome(nome.trim());
         Usuario salvo = usuarioRepository.save(usuario);
         auditService.registrar(EventoAuditoria.PERFIL_ATUALIZADO, salvo.getEmail(), null);

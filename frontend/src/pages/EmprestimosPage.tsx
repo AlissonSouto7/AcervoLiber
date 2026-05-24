@@ -69,7 +69,7 @@ export default function EmprestimosPage() {
   const registrar = useMutation({
     mutationFn: (payload: EmprestimoPayload) => registrarEmprestimo(payload),
     onSuccess: () => {
-      message.success('Emprestimo registrado');
+      message.success('Empréstimo registrado');
       invalidarRelacionadas();
       setDrawerAberto(false);
     },
@@ -79,7 +79,7 @@ export default function EmprestimosPage() {
   const devolver = useMutation({
     mutationFn: (id: number) => devolverEmprestimo(id),
     onSuccess: () => {
-      message.success('Devolucao registrada');
+      message.success('Devolução registrada');
       invalidarRelacionadas();
     },
     onError: (erro) => message.error(mensagemDeErro(erro)),
@@ -98,7 +98,7 @@ export default function EmprestimosPage() {
 
   const botaoDevolver = (emp: EmprestimoResponse) => (
     <Popconfirm
-      title="Confirmar devolucao deste livro?"
+      title="Confirmar devolução deste livro?"
       okText="Devolver"
       cancelText="Cancelar"
       onConfirm={() => devolver.mutate(emp.id)}
@@ -114,7 +114,7 @@ export default function EmprestimosPage() {
     { title: 'Aluno', dataIndex: ['aluno', 'nome'] },
     { title: 'Turma', dataIndex: ['aluno', 'turma'], width: 90 },
     {
-      title: 'Devolver ate',
+      title: 'Devolver até',
       key: 'prazo',
       width: 130,
       render: (_, e) => formatarData(e.dataDevolucaoPrevista),
@@ -125,7 +125,7 @@ export default function EmprestimosPage() {
       width: 180,
       render: (_, e) => <StatusUrgenciaTag status={e.statusUrgencia} />,
     },
-    { title: 'Acoes', key: 'acoes', width: 120, render: (_, e) => botaoDevolver(e) },
+    { title: 'Ações', key: 'acoes', width: 120, render: (_, e) => botaoDevolver(e) },
   ];
 
   return (
@@ -141,10 +141,10 @@ export default function EmprestimosPage() {
         }}
       >
         <Typography.Title level={3} style={{ margin: 0 }}>
-          Emprestimos ativos
+          Empréstimos ativos
         </Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerAberto(true)}>
-          Novo emprestimo
+          Novo empréstimo
         </Button>
       </div>
 
@@ -152,7 +152,7 @@ export default function EmprestimosPage() {
         <List
           loading={isLoading}
           dataSource={ativos ?? []}
-          locale={{ emptyText: 'Nenhum emprestimo ativo' }}
+          locale={{ emptyText: 'Nenhum empréstimo ativo' }}
           pagination={{ pageSize: 8, hideOnSinglePage: true }}
           renderItem={(emp) => (
             <Card size="small" style={{ marginBottom: 12 }}>
@@ -166,7 +166,7 @@ export default function EmprestimosPage() {
                   </div>
                   <div>
                     <Typography.Text type="secondary">
-                      Devolver ate {formatarData(emp.dataDevolucaoPrevista)}
+                      Devolver até {formatarData(emp.dataDevolucaoPrevista)}
                     </Typography.Text>
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -185,13 +185,13 @@ export default function EmprestimosPage() {
           columns={colunas}
           dataSource={ativos ?? []}
           scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Nenhum emprestimo ativo' }}
+          locale={{ emptyText: 'Nenhum empréstimo ativo' }}
           pagination={{ pageSize: 10, hideOnSinglePage: true }}
         />
       )}
 
       <Drawer
-        title="Novo emprestimo"
+        title="Novo empréstimo"
         open={drawerAberto}
         onClose={() => setDrawerAberto(false)}
         width={isMobile ? '100%' : 420}
@@ -230,13 +230,13 @@ export default function EmprestimosPage() {
             </Form.Item>
             <Form.Item
               name="prazoDias"
-              label="Prazo de devolucao (dias)"
+              label="Prazo de devolução (dias)"
               rules={[{ required: true, message: 'Informe o prazo' }]}
             >
               <InputNumber style={{ width: '100%' }} min={1} max={30} />
             </Form.Item>
             <Button type="primary" htmlType="submit" block loading={registrar.isPending}>
-              Registrar emprestimo
+              Registrar empréstimo
             </Button>
           </Form>
         )}

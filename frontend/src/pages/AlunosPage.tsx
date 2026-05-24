@@ -94,7 +94,7 @@ export default function AlunosPage() {
       <Button size="small" icon={<EditOutlined />} onClick={() => abrirEdicao(aluno)} />
       <Popconfirm
         title="Remover este aluno?"
-        description="So e possivel remover alunos sem historico de emprestimos."
+        description="Só é possível remover alunos sem histórico de empréstimos."
         okText="Remover"
         cancelText="Cancelar"
         okButtonProps={{ danger: true }}
@@ -106,11 +106,11 @@ export default function AlunosPage() {
   );
 
   const colunas: TableProps<AlunoResponse>['columns'] = [
-    { title: 'Matricula', dataIndex: 'matricula', width: 120 },
+    { title: 'Matrícula', dataIndex: 'matricula', width: 120 },
     { title: 'Nome', dataIndex: 'nome' },
     { title: 'Turma', dataIndex: 'turma', width: 90 },
-    { title: 'Emprestimos', key: 'emp', width: 200, render: (_, a) => tagEmprestimos(a) },
-    { title: 'Acoes', key: 'acoes', width: 110, render: (_, a) => acoes(a) },
+    { title: 'Empréstimos', key: 'emp', width: 200, render: (_, a) => tagEmprestimos(a) },
+    { title: 'Ações', key: 'acoes', width: 110, render: (_, a) => acoes(a) },
   ];
 
   const paginacao = {
@@ -137,7 +137,7 @@ export default function AlunosPage() {
         </Typography.Title>
         <Space wrap style={{ flex: isMobile ? '1 1 100%' : undefined }}>
           <Input.Search
-            placeholder="Buscar por nome, matricula ou turma"
+            placeholder="Buscar por nome, matrícula ou turma"
             allowClear
             onSearch={(v) => {
               setTermo(v);
@@ -200,8 +200,8 @@ export default function AlunosPage() {
           >
             <Form.Item
               name="matricula"
-              label="Matricula"
-              rules={[{ required: true, message: 'Informe a matricula' }]}
+              label="Matrícula"
+              rules={[{ required: true, message: 'Informe a matrícula' }]}
             >
               <Input />
             </Form.Item>
