@@ -1,0 +1,131 @@
+# =============================================================================
+# docker-compose.gcp.yml — deploy GCP e2-micro + Neon Postgres
+# =============================================================================
+# Stack standalone (NAO usa overlay sobre docker-compose.yml base, porque a
+# e2-micro tem 1 GB RAM e nao roda Postgres local — usamos Neon como Postgres
+# managed gratuito).
+#
+# Diferencas vs docker-compose.prod.yml (que era pra Oracle ARM 24 GB):
+#   1. Sem servico `postgres` — banco vive no Neon (external host)
+#   2. Sem servico `backup` (pg_dump contra Neon vai ser via cron na VM, separado)
+#   3. mem_limit do app reduzido pra 600m (cabe em e2-micro 1 GB)
+#   4. JAVA_OPTS ajustado pra heap menor (-XX:MaxRAMPercentage=75 ja era OK mas
+#      garantimos com -Xmx400m explicito)
+#
+# Comando:
+#   docker compose -f docker-compose.gcp.yml --env-file .env.prod up -d
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: liber:latest
+    container_name: liber-app
+    environment:
+      # Datasource — aponta pro Neon (external)
+      SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL:?defina SPRING_DATASOURCE_URL no .env.prod (jdbc:postgresql://...neon.tech/neondb?sslmode=require)}"
+      SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME:?defina SPRING_DATASOURCE_USERNAME no .env.prod}"
+      SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD:?defina SPRING_DATASOURCE_PASSWORD no .env.prod}"
+
+      # Hikari ajustado pra Neon free tier (max 10 conexoes simultaneas seguras)
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "${HIKARI_POOL_SIZE:-5}"
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "${HIKARI_MIN_IDLE:-1}"
+
+      # Admin seedado no primeiro boot
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@liber.local}"
+      ADMIN_NOME: "${ADMIN_NOME:-Administrador}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+
+      SEED_DADOS_EXEMPLO: "${SEED_DADOS_EXEMPLO:-false}"
+
+      JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env.prod}"
+      JWT_ISSUER: "${JWT_ISSUER:-liber}"
+      JWT_EXPIRATION_MS: "${JWT_EXPIRATION_MS:-900000}"
+      JWT_REFRESH_EXPIRATION_MS: "${JWT_REFRESH_EXPIRATION_MS:-604800000}"
+
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS no .env.prod}"
+
+      AUTH_PUBLIC_REGISTER_ENABLED: "${AUTH_PUBLIC_REGISTER_ENABLED:-false}"
+      RATE_LIMIT_LOGIN_ENABLED: "${RATE_LIMIT_LOGIN_ENABLED:-true}"
+
+      GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
+
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-prod}"
+
+      # JVM tuning para e2-micro (1 GB RAM total da VM, app pega no maximo 400 MB).
+      # MaxRAMPercentage=40 do mem_limit (600m) = 240m heap. Apertado mas funciona
+      # com Spring Boot enxuto. Se OOMs, subir mem_limit pra 700m e reduzir frontend.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=40 -XX:+UseSerialGC -Djava.security.egd=file:/dev/./urandom"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s  # +30s vs Oracle: cold start do Neon na primeira conexao
+    restart: unless-stopped
+    mem_limit: 600m
+    cpus: 0.6
+    networks:
+      - liber-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL:-}"
+    image: liber-frontend:latest
+    container_name: liber-web
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.2
+    networks:
+      - liber-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: liber-caddy
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: "${DOMAIN:?defina DOMAIN no .env.prod (ex: acervoliber.duckdns.org)}"
+      ACME_EMAIL: "${ACME_EMAIL:?defina ACME_EMAIL no .env.prod}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    mem_limit: 96m
+    cpus: 0.2
+    networks:
+      - liber-net
+
+volumes:
+  caddy_data:
+    name: liber-caddy-data
+  caddy_config:
+    name: liber-caddy-config
+  caddy_logs:
+    name: liber-caddy-logs
+
+networks:
+  liber-net:
+    name: liber-net
+    driver: bridge
