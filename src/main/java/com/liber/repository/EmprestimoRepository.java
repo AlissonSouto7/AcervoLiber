@@ -43,6 +43,14 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
     long countAtrasados(@Param("hoje") LocalDate hoje);
 
     @Query("""
+        SELECT COUNT(e) FROM Emprestimo e
+        WHERE e.aluno.id = :alunoId
+          AND e.situacao = com.liber.entity.SituacaoEmprestimo.ATIVO
+          AND e.dataDevolucaoPrevista < :hoje
+        """)
+    long countAtrasadosByAluno(@Param("alunoId") Long alunoId, @Param("hoje") LocalDate hoje);
+
+    @Query("""
         SELECT new com.liber.dto.LivroRankingDTO(
             l.id, l.titulo, l.autor, COUNT(e)
         )

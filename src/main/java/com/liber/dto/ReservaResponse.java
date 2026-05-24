@@ -23,4 +23,16 @@ public record ReservaResponse(
             reserva.getDataExpiracao()
         );
     }
+
+    /** Variante para fila do bibliotecario — matricula do aluno mascarada (LGPD). */
+    public static ReservaResponse fromMascarado(Reserva reserva) {
+        return new ReservaResponse(
+            reserva.getId(),
+            LivroResumoDTO.from(reserva.getLivro()),
+            AlunoResumoDTO.mascarado(reserva.getAluno()),
+            reserva.getStatus(),
+            reserva.getDataReserva(),
+            reserva.getDataExpiracao()
+        );
+    }
 }

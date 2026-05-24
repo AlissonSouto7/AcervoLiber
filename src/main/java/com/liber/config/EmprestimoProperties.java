@@ -15,5 +15,12 @@ public record EmprestimoProperties(
     int prazoMaximoDias,
 
     @Min(1)
-    int limitePorAluno
+    int limitePorAluno,
+
+    /**
+     * Numero maximo de renovacoes permitidas por emprestimo. Default 2 — padrao
+     * de biblioteca escolar. 0 desabilita renovacao.
+     */
+    @Min(0)
+    int maxRenovacoes
 ) {}

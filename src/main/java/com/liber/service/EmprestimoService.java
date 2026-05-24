@@ -42,10 +42,12 @@ public class EmprestimoService {
 
     public List<EmprestimoResponse> listarAtivos() {
         LocalDate hoje = LocalDate.now(clock);
+        // Tela visivel a quem passar atras do balcao (visitante, pais de outros alunos)
+        // — matricula mascarada por LGPD §14 (dados de menores).
         return emprestimoRepository
             .findBySituacaoOrderByDataDevolucaoPrevistaAsc(SituacaoEmprestimo.ATIVO)
             .stream()
-            .map(e -> EmprestimoResponse.from(e, hoje))
+            .map(e -> EmprestimoResponse.fromMascarado(e, hoje))
             .toList();
     }
 
@@ -79,6 +81,17 @@ public class EmprestimoService {
         Aluno aluno = alunoRepository.findByIdForUpdate(req.alunoId())
             .orElseThrow(() -> ResourceNotFoundException.of("Aluno", req.alunoId()));
 
+        LocalDate hoje = LocalDate.now(clock);
+
+        // Bloqueio por atraso: aluno com livro vencido nao pega novo no balcao.
+        // Regra de biblioteca escolar — sem isso o aluno acumula atrasos indefinidamente.
+        long atrasados = emprestimoRepository.countAtrasadosByAluno(aluno.getId(), hoje);
+        if (atrasados > 0) {
+            throw new RegraEmprestimoException(
+                "Aluno possui %d livro(s) em atraso. Devolva antes de pegar novos emprestimos."
+                    .formatted(atrasados));
+        }
+
         // O limite considera emprestimos ATIVOS + reservas PENDENTES — uma reserva
         // pendente ja segura um exemplar e vira emprestimo ao ser confirmada; ignora-la
         // aqui deixaria o aluno furar o limite pegando livros no balcao.
@@ -101,7 +114,6 @@ public class EmprestimoService {
         Livro livro = livroRepository.findById(req.livroId())
             .orElseThrow(() -> ResourceNotFoundException.of("Livro", req.livroId()));
 
-        LocalDate hoje = LocalDate.now(clock);
         Emprestimo emprestimo = Emprestimo.builder()
             .livro(livro)
             .aluno(aluno)
@@ -120,6 +132,68 @@ public class EmprestimoService {
                 + ", aluno matricula=" + aluno.getMatricula() + ", prazo=" + req.prazoDias() + "d");
         log.info("Emprestimo registrado id={} livro={} aluno={} prazo={}d",
             salvo.getId(), livro.getId(), aluno.getId(), req.prazoDias());
+        return EmprestimoResponse.from(salvo, hoje);
+    }
+
+    /**
+     * Renova um empréstimo ATIVO, estendendo a data de devolucao prevista a partir
+     * de hoje + {@code prazoDias}. Incrementa o contador de renovacoes da entidade.
+     *
+     * <p>Bloqueios:
+     * <ul>
+     *   <li>Empréstimo nao-ATIVO (ja devolvido) — 422 "ja foi devolvido"</li>
+     *   <li>Empréstimo em atraso — 422 "devolva antes de renovar"</li>
+     *   <li>Limite de renovacoes atingido — 422 com contador</li>
+     *   <li>Existe reserva PENDENTE do mesmo livro por outro aluno — 422 "outro aluno aguardando"</li>
+     *   <li>Prazo solicitado acima do maximo — 422 padrao</li>
+     * </ul>
+     */
+    @Transactional
+    public EmprestimoResponse renovar(Long emprestimoId, int prazoDias) {
+        validarPrazo(prazoDias);
+
+        Emprestimo emp = emprestimoRepository.findById(emprestimoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Emprestimo", emprestimoId));
+
+        if (emp.getSituacao() != SituacaoEmprestimo.ATIVO) {
+            throw new RegraEmprestimoException(
+                "Emprestimo nao esta ativo (situacao: " + emp.getSituacao() + ")");
+        }
+
+        LocalDate hoje = LocalDate.now(clock);
+        if (emp.getDataDevolucaoPrevista().isBefore(hoje)) {
+            throw new RegraEmprestimoException(
+                "Emprestimo esta em atraso. Devolva o livro antes de renovar.");
+        }
+
+        if (emp.getRenovacoes() >= props.maxRenovacoes()) {
+            throw new RegraEmprestimoException(
+                "Limite de %d renovacoes atingido para este emprestimo."
+                    .formatted(props.maxRenovacoes()));
+        }
+
+        // Bloqueia renovacao se outro aluno esta aguardando o mesmo livro — padrao
+        // de biblioteca: quem reservou tem prioridade sobre quem ja esta com o livro.
+        long reservasDoLivro = reservaRepository.countByLivroIdAndStatus(
+            emp.getLivro().getId(), StatusReserva.PENDENTE);
+        if (reservasDoLivro > 0) {
+            throw new RegraEmprestimoException(
+                "Existe(m) %d reserva(s) pendente(s) para este livro. Renovacao bloqueada."
+                    .formatted(reservasDoLivro));
+        }
+
+        emp.setDataDevolucaoPrevista(hoje.plusDays(prazoDias));
+        emp.setPrazoDias(prazoDias);
+        emp.setRenovacoes(emp.getRenovacoes() + 1);
+
+        Emprestimo salvo = emprestimoRepository.save(emp);
+        auditService.registrar(EventoAuditoria.EMPRESTIMO_RENOVADO, null,
+            "Emprestimo id=" + salvo.getId() + ", livro id=" + emp.getLivro().getId()
+                + ", aluno matricula=" + emp.getAluno().getMatricula()
+                + ", renovacao #" + salvo.getRenovacoes() + ", novo prazo=" + prazoDias + "d"
+                + ", nova devolucao prevista=" + salvo.getDataDevolucaoPrevista());
+        log.info("Renovacao registrada emprestimo id={} renovacao#{} novoVencimento={}",
+            salvo.getId(), salvo.getRenovacoes(), salvo.getDataDevolucaoPrevista());
         return EmprestimoResponse.from(salvo, hoje);
     }
 

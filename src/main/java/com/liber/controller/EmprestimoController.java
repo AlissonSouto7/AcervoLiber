@@ -2,6 +2,7 @@ package com.liber.controller;
 
 import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
+import com.liber.dto.RenovarEmprestimoRequest;
 import com.liber.service.EmprestimoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -78,5 +79,13 @@ public class EmprestimoController {
     @Operation(summary = "Registra a devolucao de um emprestimo (incrementa estoque)")
     public ResponseEntity<EmprestimoResponse> registrarDevolucao(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(emprestimoService.registrarDevolucao(id));
+    }
+
+    @PostMapping("/{id}/renovacao")
+    @PreAuthorize("hasAnyRole('BIBLIOTECARIO','ADMIN')")
+    @Operation(summary = "Renova o prazo de um emprestimo ativo (limite e regras no service)")
+    public ResponseEntity<EmprestimoResponse> renovar(@PathVariable Long id,
+                                                      @Valid @RequestBody RenovarEmprestimoRequest req) {
+        return ResponseEntity.ok(emprestimoService.renovar(id, req.prazoDias()));
     }
 }

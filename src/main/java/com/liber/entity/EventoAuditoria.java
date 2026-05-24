@@ -17,6 +17,8 @@ public enum EventoAuditoria {
     ACESSO_NEGADO,
     /** Empréstimo de livro registrado (saida de bem material). */
     EMPRESTIMO_REGISTRADO,
+    /** Prazo de devolucao estendido (renovacao pelo bibliotecario). */
+    EMPRESTIMO_RENOVADO,
     /** Empréstimo devolvido. */
     EMPRESTIMO_DEVOLVIDO,
     /** Estoque inconsistente — incremento de devolucao nao surtiu efeito (clamp). */

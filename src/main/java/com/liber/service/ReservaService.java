@@ -70,6 +70,17 @@ public class ReservaService {
             throw new BusinessException("Voce ja tem uma reserva pendente para este livro.");
         }
 
+        LocalDate hoje = LocalDate.now(clock);
+
+        // Mesmo bloqueio do emprestimo direto: aluno em atraso nao pode nem reservar.
+        // Sem isso, ele contornaria o bloqueio do balcao indo pelo portal de reservas.
+        long atrasados = emprestimoRepository.countAtrasadosByAluno(alunoId, hoje);
+        if (atrasados > 0) {
+            throw new BusinessException(
+                "Voce possui %d livro(s) em atraso. Devolva antes de reservar novos."
+                    .formatted(atrasados));
+        }
+
         long ativos = emprestimoRepository.countByAlunoIdAndSituacao(alunoId, SituacaoEmprestimo.ATIVO);
         long pendentes = reservaRepository.countByAlunoIdAndStatus(alunoId, StatusReserva.PENDENTE);
         int limite = emprestimoProps.limitePorAluno();
@@ -89,7 +100,6 @@ public class ReservaService {
         Livro livro = livroRepository.findById(livroId)
             .orElseThrow(() -> ResourceNotFoundException.of("Livro", livroId));
 
-        LocalDate hoje = LocalDate.now(clock);
         Reserva reserva = Reserva.builder()
             .livro(livro)
             .aluno(aluno)
@@ -141,8 +151,10 @@ public class ReservaService {
     // ---------- Acoes do bibliotecario ----------
 
     public Page<ReservaResponse> listarPendentes(Pageable pageable) {
+        // Fila do bibliotecario visivel a quem passar atras do balcao — matricula
+        // mascarada por LGPD §14. Nome+turma continuam para identificacao.
         return reservaRepository.findByStatusOrderByDataReservaAsc(StatusReserva.PENDENTE, pageable)
-            .map(ReservaResponse::from);
+            .map(ReservaResponse::fromMascarado);
     }
 
     @Transactional

@@ -15,6 +15,7 @@ import com.liber.entity.Aluno;
 import com.liber.entity.Emprestimo;
 import com.liber.entity.Livro;
 import com.liber.entity.SituacaoEmprestimo;
+import com.liber.entity.StatusReserva;
 import com.liber.exception.EstoqueIndisponivelException;
 import com.liber.exception.RegraEmprestimoException;
 import com.liber.exception.ResourceNotFoundException;
@@ -45,7 +46,7 @@ class EmprestimoServiceTest {
     @Mock ReservaRepository reservaRepository;
     @Mock AuditService auditService;
 
-    private final EmprestimoProperties props = new EmprestimoProperties(7, 30, 3);
+    private final EmprestimoProperties props = new EmprestimoProperties(7, 30, 3, 2);
     private EmprestimoService service;
 
     @BeforeEach
@@ -108,6 +109,19 @@ class EmprestimoServiceTest {
         assertThatThrownBy(() -> service.registrar(req))
             .isInstanceOf(RegraEmprestimoException.class)
             .hasMessageContaining("limite");
+
+        verify(livroRepository, never()).decrementarEstoque(any());
+    }
+
+    @Test
+    void registrar_rejeita_quando_aluno_tem_livro_em_atraso() {
+        EmprestimoRequest req = new EmprestimoRequest(20L, 10L, 7);
+        when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno()));
+        when(emprestimoRepository.countAtrasadosByAluno(10L, HOJE)).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.registrar(req))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("atraso");
 
         verify(livroRepository, never()).decrementarEstoque(any());
     }
@@ -180,5 +194,72 @@ class EmprestimoServiceTest {
             .hasMessageContaining("ja devolvido");
 
         verify(livroRepository, never()).incrementarEstoque(eq(20L));
+    }
+
+    // ---------------------- Renovacao ----------------------
+
+    private static Emprestimo emprestimoAtivo(int diasParaVencer, int renovacoesJaFeitas) {
+        return Emprestimo.builder()
+            .id(100L).livro(livro()).aluno(aluno())
+            .dataEmprestimo(HOJE.minusDays(5)).prazoDias(7)
+            .dataDevolucaoPrevista(HOJE.plusDays(diasParaVencer))
+            .situacao(SituacaoEmprestimo.ATIVO)
+            .renovacoes(renovacoesJaFeitas)
+            .build();
+    }
+
+    @Test
+    void renovar_happy_path_estende_prazo_e_incrementa_contador() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+        when(reservaRepository.countByLivroIdAndStatus(20L, StatusReserva.PENDENTE)).thenReturn(0L);
+        when(emprestimoRepository.save(any(Emprestimo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EmprestimoResponse resp = service.renovar(100L, 7);
+
+        assertThat(resp.dataDevolucaoPrevista()).isEqualTo(HOJE.plusDays(7));
+        assertThat(emp.getRenovacoes()).isEqualTo(1);
+    }
+
+    @Test
+    void renovar_rejeita_emprestimo_nao_ativo() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        emp.setSituacao(SituacaoEmprestimo.DEVOLVIDO);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.renovar(100L, 7))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("nao esta ativo");
+    }
+
+    @Test
+    void renovar_rejeita_emprestimo_em_atraso() {
+        Emprestimo emp = emprestimoAtivo(-1, 0); // venceu ontem
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.renovar(100L, 7))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("atraso");
+    }
+
+    @Test
+    void renovar_rejeita_quando_limite_atingido() {
+        Emprestimo emp = emprestimoAtivo(3, 2); // limite=2, ja renovou 2x
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.renovar(100L, 7))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("Limite");
+    }
+
+    @Test
+    void renovar_rejeita_quando_outro_aluno_tem_reserva_pendente() {
+        Emprestimo emp = emprestimoAtivo(3, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+        when(reservaRepository.countByLivroIdAndStatus(20L, StatusReserva.PENDENTE)).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.renovar(100L, 7))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("reserva");
     }
 }

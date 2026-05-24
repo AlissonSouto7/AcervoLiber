@@ -53,7 +53,7 @@ class ReservaServiceTest {
     @Mock AuditService auditService;
 
     private final ReservaProperties reservaProps = new ReservaProperties(3);
-    private final EmprestimoProperties emprestimoProps = new EmprestimoProperties(7, 30, 3);
+    private final EmprestimoProperties emprestimoProps = new EmprestimoProperties(7, 30, 3, 2);
     private ReservaService service;
 
     @BeforeEach
@@ -139,6 +139,20 @@ class ReservaServiceTest {
         assertThatThrownBy(() -> service.reservar(EMAIL, 20L))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("limite");
+        verify(livroRepository, never()).decrementarEstoque(any());
+    }
+
+    @Test
+    void reservar_rejeita_quando_aluno_tem_livro_em_atraso() {
+        Aluno aluno = aluno();
+        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(usuarioAluno(aluno)));
+        when(alunoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(aluno));
+        when(reservaRepository.existsByAlunoIdAndLivroIdAndStatus(any(), any(), any())).thenReturn(false);
+        when(emprestimoRepository.countAtrasadosByAluno(eq(10L), any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.reservar(EMAIL, 20L))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("atraso");
         verify(livroRepository, never()).decrementarEstoque(any());
     }
 

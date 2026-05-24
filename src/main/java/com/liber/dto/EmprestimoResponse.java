@@ -29,4 +29,22 @@ public record EmprestimoResponse(
             StatusUrgencia.from(emprestimo, hoje)
         );
     }
+
+    /**
+     * Variante para listagens administrativas (Emprestimos Ativos) onde a tela
+     * fica visivel a terceiros — matricula do aluno mascarada (LGPD §14).
+     */
+    public static EmprestimoResponse fromMascarado(Emprestimo emprestimo, LocalDate hoje) {
+        return new EmprestimoResponse(
+            emprestimo.getId(),
+            LivroResumoDTO.from(emprestimo.getLivro()),
+            AlunoResumoDTO.mascarado(emprestimo.getAluno()),
+            emprestimo.getDataEmprestimo(),
+            emprestimo.getPrazoDias(),
+            emprestimo.getDataDevolucaoPrevista(),
+            emprestimo.getDataDevolucaoEfetiva(),
+            emprestimo.getSituacao(),
+            StatusUrgencia.from(emprestimo, hoje)
+        );
+    }
 }

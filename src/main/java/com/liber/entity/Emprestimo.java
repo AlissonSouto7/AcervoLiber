@@ -83,6 +83,16 @@ public class Emprestimo extends AuditableEntity {
     @ToString.Include
     private SituacaoEmprestimo situacao;
 
+    /**
+     * Numero de renovacoes ja aplicadas a este emprestimo (0 = nunca foi renovado).
+     * O limite e configuravel via {@code app.emprestimo.max-renovacoes} (default 2).
+     */
+    @NotNull
+    @Min(0)
+    @Column(name = "renovacoes", nullable = false)
+    @Builder.Default
+    private Integer renovacoes = 0;
+
     @Version
     @Column(nullable = false)
     private Long version;
