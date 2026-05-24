@@ -12,6 +12,15 @@ export async function loginAluno(matricula: string, senha: string): Promise<Logi
   return resp.data;
 }
 
+/**
+ * Auto-cadastro de aluno (tela publica). Backend valida que a matricula foi
+ * pre-cadastrada pela escola e que o nome bate (defesa anti-sequestro).
+ */
+export async function registerAluno(matricula: string, nome: string, senha: string): Promise<Usuario> {
+  const resp = await http.post<Usuario>('/auth/register-aluno', { matricula, nome, senha });
+  return resp.data;
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   await http.post('/auth/logout', { refreshToken });
 }

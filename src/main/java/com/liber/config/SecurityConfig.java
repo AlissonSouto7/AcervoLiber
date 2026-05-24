@@ -35,6 +35,7 @@ public class SecurityConfig {
         "/api/v1/auth/login",
         "/api/v1/auth/login-aluno",
         "/api/v1/auth/register",
+        "/api/v1/auth/register-aluno",
         "/api/v1/auth/refresh",
         // /api/v1/auth/logout NAO e mais publico — exige autenticacao + validacao
         // de ownership do refresh token (senao qualquer um revoga sessao alheia).

@@ -2,6 +2,7 @@ package com.liber.service;
 
 import com.liber.dto.AlunoRequest;
 import com.liber.dto.AlunoResponse;
+import com.liber.dto.auth.RegisterAlunoRequest;
 import com.liber.dto.auth.UsuarioResponse;
 import com.liber.entity.Aluno;
 import com.liber.entity.EventoAuditoria;
@@ -14,6 +15,7 @@ import com.liber.repository.AlunoRepository;
 import com.liber.repository.EmprestimoRepository;
 import com.liber.repository.ReservaRepository;
 import com.liber.repository.UsuarioRepository;
+import java.text.Normalizer;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,6 +108,85 @@ public class AlunoService {
         }
         alunoRepository.deleteById(id);
         log.info("Aluno removido id={}", id);
+    }
+
+    /**
+     * Auto-cadastro do aluno na tela publica de login.
+     *
+     * <p>Diferente de {@link #criarAcesso} (chamado pelo bibliotecario), aqui o
+     * proprio aluno escolhe a senha. Pra evitar sequestro de conta (atacante que
+     * sabe a matricula do colega), exigimos que:
+     * <ul>
+     *   <li>matricula existe (aluno foi pre-cadastrado pela escola)</li>
+     *   <li>nome do request bate com cadastro (normalizado: case-insensitive, sem acentos)</li>
+     *   <li>aluno ainda nao tem Usuario vinculado</li>
+     * </ul>
+     *
+     * <p>Mensagem de erro neutra ("dados nao conferem") em caso de matricula
+     * inexistente OU nome divergente — nao revela se a matricula foi cadastrada.
+     */
+    @Transactional
+    public UsuarioResponse autoRegistrar(RegisterAlunoRequest req) {
+        String matricula = req.matricula() == null ? "" : req.matricula().trim();
+        if (matricula.isEmpty()) {
+            throw new BusinessException("Matricula obrigatoria.");
+        }
+
+        Aluno aluno = alunoRepository.findByMatricula(matricula).orElse(null);
+        if (aluno == null) {
+            // Mensagem neutra — nao confirma/nega existencia da matricula.
+            throw new BusinessException("Dados nao conferem. Verifique nome e matricula com a escola.");
+        }
+
+        // Validacao de nome — defesa contra sequestro: atacante que so saiba a
+        // matricula precisa tambem saber o nome completo cadastrado.
+        if (!nomesIguais(req.nome(), aluno.getNome())) {
+            throw new BusinessException("Dados nao conferem. Verifique nome e matricula com a escola.");
+        }
+
+        if (usuarioRepository.existsByAlunoId(aluno.getId())) {
+            // Aqui podemos ser explicitos — o aluno legitimo precisa saber pra logar.
+            throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
+        }
+
+        String email = "aluno." + matricula.toLowerCase() + "@liber.local";
+        Usuario usuario = Usuario.builder()
+            .email(email)
+            .nome(aluno.getNome())              // usa o nome CADASTRADO (case original), nao o do request
+            .senhaHash(passwordEncoder.encode(req.senha()))
+            .role(Role.ALUNO)
+            .ativo(true)
+            .passwordChangedAt(Instant.now())
+            .deveTrocarSenha(false)              // ja definiu senha no auto-cadastro
+            .aluno(aluno)
+            .build();
+
+        Usuario salvo;
+        try {
+            salvo = usuarioRepository.save(usuario);
+        } catch (DataIntegrityViolationException e) {
+            // Race: outro request auto-cadastrando o mesmo aluno no mesmo segundo.
+            throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
+        }
+        auditService.registrar(EventoAuditoria.USUARIO_CRIADO, salvo.getEmail(),
+            "Auto-cadastro de aluno (matricula " + aluno.getMatricula() + ")");
+        log.info("Auto-cadastro de aluno matricula={}", aluno.getMatricula());
+        return UsuarioResponse.from(salvo);
+    }
+
+    /**
+     * Normaliza e compara dois nomes: trim, multiplas espacos -> 1, lowercase,
+     * remove acentos. Permite que "Joao da Silva" == " JOÃO  DA SILVA " == "joão da silva".
+     */
+    private static boolean nomesIguais(String a, String b) {
+        return normalizarNome(a).equals(normalizarNome(b));
+    }
+
+    private static String normalizarNome(String nome) {
+        if (nome == null) return "";
+        String norm = Normalizer.normalize(nome.trim(), Normalizer.Form.NFD)
+            .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        return norm.toLowerCase().replaceAll("\\s+", " ");
     }
 
     /**

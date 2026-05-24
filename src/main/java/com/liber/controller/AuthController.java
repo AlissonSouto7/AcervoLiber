@@ -7,9 +7,11 @@ import com.liber.dto.auth.LoginAlunoRequest;
 import com.liber.dto.auth.LoginRequest;
 import com.liber.dto.auth.LoginResponse;
 import com.liber.dto.auth.RefreshTokenRequest;
+import com.liber.dto.auth.RegisterAlunoRequest;
 import com.liber.dto.auth.RegisterRequest;
 import com.liber.dto.auth.UsuarioResponse;
 import com.liber.exception.RegistroPublicoDesabilitadoException;
+import com.liber.service.AlunoService;
 import com.liber.service.AuthService;
 import com.liber.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UsuarioService usuarioService;
+    private final AlunoService alunoService;
     private final AuthProperties authProperties;
 
     @PostMapping("/login")
@@ -76,6 +79,13 @@ public class AuthController {
             throw new RegistroPublicoDesabilitadoException();
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(req));
+    }
+
+    @PostMapping("/register-aluno")
+    @SecurityRequirements
+    @Operation(summary = "Auto-cadastro de aluno (matricula+nome+senha). Exige que o aluno tenha sido pre-cadastrado pelo bibliotecario.")
+    public ResponseEntity<UsuarioResponse> registerAluno(@Valid @RequestBody RegisterAlunoRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(alunoService.autoRegistrar(req));
     }
 
     @GetMapping("/me")
