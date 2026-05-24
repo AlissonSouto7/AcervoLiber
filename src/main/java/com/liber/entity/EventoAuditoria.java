@@ -19,6 +19,10 @@ public enum EventoAuditoria {
     EMPRESTIMO_REGISTRADO,
     /** Prazo de devolucao estendido (renovacao pelo bibliotecario). */
     EMPRESTIMO_RENOVADO,
+    /** Dados de empréstimo editados (correcao de lancamento errado). */
+    EMPRESTIMO_EDITADO,
+    /** Empréstimo cancelado (lancamento incorreto — livro volta ao estoque). */
+    EMPRESTIMO_CANCELADO,
     /** Empréstimo devolvido. */
     EMPRESTIMO_DEVOLVIDO,
     /** Estoque inconsistente — incremento de devolucao nao surtiu efeito (clamp). */

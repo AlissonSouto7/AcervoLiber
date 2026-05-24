@@ -1,5 +1,6 @@
 package com.liber.controller;
 
+import com.liber.dto.EditarEmprestimoRequest;
 import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
 import com.liber.dto.RenovarEmprestimoRequest;
@@ -16,7 +17,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -87,5 +90,21 @@ public class EmprestimoController {
     public ResponseEntity<EmprestimoResponse> renovar(@PathVariable Long id,
                                                       @Valid @RequestBody RenovarEmprestimoRequest req) {
         return ResponseEntity.ok(emprestimoService.renovar(id, req.prazoDias()));
+    }
+
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasAnyRole('BIBLIOTECARIO','ADMIN')")
+    @Operation(summary = "Edita campos de um emprestimo ativo (dataEmprestimo e/ou prazoDias)")
+    public ResponseEntity<EmprestimoResponse> editar(@PathVariable Long id,
+                                                     @Valid @RequestBody EditarEmprestimoRequest req) {
+        return ResponseEntity.ok(emprestimoService.editar(id, req));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('BIBLIOTECARIO','ADMIN')")
+    @Operation(summary = "Cancela um emprestimo (lancamento errado) — livro volta ao estoque")
+    public ResponseEntity<Void> cancelar(@PathVariable Long id) {
+        emprestimoService.cancelar(id);
+        return ResponseEntity.noContent().build();
     }
 }

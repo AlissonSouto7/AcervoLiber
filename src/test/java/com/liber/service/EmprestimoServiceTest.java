@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.liber.config.EmprestimoProperties;
+import com.liber.dto.EditarEmprestimoRequest;
 import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
 import com.liber.entity.Aluno;
@@ -261,5 +262,88 @@ class EmprestimoServiceTest {
         assertThatThrownBy(() -> service.renovar(100L, 7))
             .isInstanceOf(RegraEmprestimoException.class)
             .hasMessageContaining("reserva");
+    }
+
+    // ---------------------- Edicao ----------------------
+
+    @Test
+    void editar_happy_path_altera_prazo_e_recalcula_vencimento() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+        when(emprestimoRepository.save(any(Emprestimo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EmprestimoResponse resp = service.editar(100L, new EditarEmprestimoRequest(null, 14));
+
+        assertThat(resp.prazoDias()).isEqualTo(14);
+        assertThat(resp.dataDevolucaoPrevista()).isEqualTo(emp.getDataEmprestimo().plusDays(14));
+    }
+
+    @Test
+    void editar_rejeita_payload_vazio() {
+        assertThatThrownBy(() -> service.editar(100L, new EditarEmprestimoRequest(null, null)))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("ao menos um campo");
+    }
+
+    @Test
+    void editar_rejeita_emprestimo_ja_devolvido() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        emp.setSituacao(SituacaoEmprestimo.DEVOLVIDO);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.editar(100L, new EditarEmprestimoRequest(null, 14)))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("ativos");
+    }
+
+    @Test
+    void editar_rejeita_data_emprestimo_no_futuro() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.editar(100L,
+                new EditarEmprestimoRequest(HOJE.plusDays(1), null)))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("futuro");
+    }
+
+    @Test
+    void editar_rejeita_vencimento_resultante_no_passado() {
+        Emprestimo emp = emprestimoAtivo(2, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        // data antiga + prazo curto = vencimento no passado
+        assertThatThrownBy(() -> service.editar(100L,
+                new EditarEmprestimoRequest(HOJE.minusDays(30), 7)))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("passado");
+    }
+
+    // ---------------------- Cancelamento ----------------------
+
+    @Test
+    void cancelar_happy_path_marca_CANCELADO_e_devolve_estoque() {
+        Emprestimo emp = emprestimoAtivo(3, 0);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+        when(livroRepository.incrementarEstoque(20L)).thenReturn(1);
+
+        service.cancelar(100L);
+
+        assertThat(emp.getSituacao()).isEqualTo(SituacaoEmprestimo.CANCELADO);
+        verify(livroRepository).incrementarEstoque(20L);
+        verify(emprestimoRepository).save(emp);
+    }
+
+    @Test
+    void cancelar_rejeita_emprestimo_nao_ativo() {
+        Emprestimo emp = emprestimoAtivo(3, 0);
+        emp.setSituacao(SituacaoEmprestimo.DEVOLVIDO);
+        when(emprestimoRepository.findById(100L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> service.cancelar(100L))
+            .isInstanceOf(RegraEmprestimoException.class)
+            .hasMessageContaining("ativos");
+
+        verify(livroRepository, never()).incrementarEstoque(any());
     }
 }

@@ -1,6 +1,7 @@
 package com.liber.service;
 
 import com.liber.config.EmprestimoProperties;
+import com.liber.dto.EditarEmprestimoRequest;
 import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
 import com.liber.entity.Aluno;
@@ -195,6 +196,104 @@ public class EmprestimoService {
         log.info("Renovacao registrada emprestimo id={} renovacao#{} novoVencimento={}",
             salvo.getId(), salvo.getRenovacoes(), salvo.getDataDevolucaoPrevista());
         return EmprestimoResponse.from(salvo, hoje);
+    }
+
+    /**
+     * Edita campos de um empréstimo ATIVO para corrigir lancamento errado.
+     * Aceita data de empréstimo e/ou prazo (apenas os enviados sao alterados).
+     * Recalcula automaticamente a data de devolucao prevista.
+     *
+     * <p>Bloqueios: empréstimo nao-ATIVO; payload vazio; data de empréstimo no
+     * futuro; vencimento resultante no passado.
+     */
+    @Transactional
+    public EmprestimoResponse editar(Long emprestimoId, EditarEmprestimoRequest req) {
+        if (req.isVazio()) {
+            throw new RegraEmprestimoException(
+                "Informe ao menos um campo para editar (dataEmprestimo ou prazoDias).");
+        }
+
+        Emprestimo emp = emprestimoRepository.findById(emprestimoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Emprestimo", emprestimoId));
+
+        if (emp.getSituacao() != SituacaoEmprestimo.ATIVO) {
+            throw new RegraEmprestimoException(
+                "So e possivel editar emprestimos ativos (situacao atual: " + emp.getSituacao() + ").");
+        }
+
+        LocalDate hoje = LocalDate.now(clock);
+        LocalDate antesData = emp.getDataEmprestimo();
+        Integer antesPrazo = emp.getPrazoDias();
+
+        if (req.dataEmprestimo() != null) {
+            if (req.dataEmprestimo().isAfter(hoje)) {
+                throw new RegraEmprestimoException("Data de emprestimo nao pode ser no futuro.");
+            }
+            emp.setDataEmprestimo(req.dataEmprestimo());
+        }
+        if (req.prazoDias() != null) {
+            validarPrazo(req.prazoDias());
+            emp.setPrazoDias(req.prazoDias());
+        }
+
+        LocalDate novoVencimento = emp.getDataEmprestimo().plusDays(emp.getPrazoDias());
+        // Coerencia: nao deixa o BIB salvar com vencimento no passado (criaria
+        // emprestimo ja atrasado pela edicao, confundindo as regras de bloqueio).
+        if (novoVencimento.isBefore(hoje)) {
+            throw new RegraEmprestimoException(
+                "Data de devolucao resultante (%s) esta no passado.".formatted(novoVencimento));
+        }
+        emp.setDataDevolucaoPrevista(novoVencimento);
+
+        Emprestimo salvo = emprestimoRepository.save(emp);
+        auditService.registrar(EventoAuditoria.EMPRESTIMO_EDITADO, null,
+            "Emprestimo id=" + salvo.getId()
+                + ", data " + antesData + " -> " + salvo.getDataEmprestimo()
+                + ", prazo " + antesPrazo + "d -> " + salvo.getPrazoDias() + "d"
+                + ", nova devolucao prevista=" + salvo.getDataDevolucaoPrevista());
+        log.info("Emprestimo editado id={} (data {}->{}, prazo {}->{})",
+            salvo.getId(), antesData, salvo.getDataEmprestimo(), antesPrazo, salvo.getPrazoDias());
+        return EmprestimoResponse.from(salvo, hoje);
+    }
+
+    /**
+     * Cancela um empréstimo (lancamento errado pelo bibliotecario). Marca como
+     * CANCELADO (soft delete, preserva FK de reservas confirmadas) e devolve
+     * o livro ao estoque. Diferente de devolucao — esse caminho indica que o
+     * empréstimo nunca devia ter existido.
+     *
+     * <p>Bloqueio: nao cancela empréstimo nao-ATIVO (DEVOLVIDO/CANCELADO).
+     */
+    @Transactional
+    public void cancelar(Long emprestimoId) {
+        Emprestimo emp = emprestimoRepository.findById(emprestimoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Emprestimo", emprestimoId));
+
+        if (emp.getSituacao() != SituacaoEmprestimo.ATIVO) {
+            throw new RegraEmprestimoException(
+                "So e possivel cancelar emprestimos ativos (situacao atual: " + emp.getSituacao() + ").");
+        }
+
+        int atualizadas = livroRepository.incrementarEstoque(emp.getLivro().getId());
+        if (atualizadas == 0) {
+            // Mesma semantica do registrarDevolucao — sinal estruturado em vez
+            // de apenas log, para drift de estoque nao acumular silenciosamente.
+            log.warn("Incremento de estoque nao afetou linhas no cancelamento do emprestimo id={}",
+                emprestimoId);
+            auditService.registrar(EventoAuditoria.ESTOQUE_DIVERGENCIA, null,
+                "Cancelamento do emprestimo id=" + emprestimoId
+                    + " nao incrementou estoque do livro id=" + emp.getLivro().getId()
+                    + " (provavelmente ja estava no teto)");
+        }
+
+        emp.setSituacao(SituacaoEmprestimo.CANCELADO);
+        emprestimoRepository.save(emp);
+        auditService.registrar(EventoAuditoria.EMPRESTIMO_CANCELADO, null,
+            "Emprestimo id=" + emp.getId() + ", livro id=" + emp.getLivro().getId()
+                + ", aluno matricula=" + emp.getAluno().getMatricula()
+                + " (lancamento incorreto, livro devolvido ao estoque)");
+        log.info("Emprestimo cancelado id={} livro={} aluno={}",
+            emp.getId(), emp.getLivro().getId(), emp.getAluno().getId());
     }
 
     @Transactional
