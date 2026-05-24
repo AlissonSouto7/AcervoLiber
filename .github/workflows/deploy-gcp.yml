@@ -146,6 +146,6 @@ jobs:
             # 5. Limpeza de imagens orfas (> 72h) pra não encher o disco
             docker image prune -af --filter "until=72h" || true
 
-            # 6. Verifica saúde
+            # 6. Verifica saúde (precisa do --env-file pra interpolar as vars do compose)
             sleep 15
-            docker compose -f docker-compose.gcp.yml ps
+            docker compose -f docker-compose.gcp.yml --env-file .env.prod ps
