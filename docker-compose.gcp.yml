@@ -18,10 +18,13 @@
 
 services:
   app:
+    # Em CI/CD via GitHub Actions: ${APP_IMAGE} aponta pro GHCR (build feito no runner amd64).
+    # Em deploy manual local na VM: deixe APP_IMAGE vazio no .env.prod pra forçar build local
+    # (compose vai resolver pra `liber:latest` e o build: abaixo entra em ação).
+    image: ${APP_IMAGE:-liber:latest}
     build:
       context: .
       dockerfile: Dockerfile
-    image: liber:latest
     container_name: liber-app
     environment:
       # Datasource — aponta pro Neon (external)
@@ -71,12 +74,13 @@ services:
       - liber-net
 
   frontend:
+    # Mesma logica do app: GHCR via CI/CD ou build local.
+    image: ${FRONTEND_IMAGE:-liber-frontend:latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL:-}"
-    image: liber-frontend:latest
     container_name: liber-web
     depends_on:
       app:

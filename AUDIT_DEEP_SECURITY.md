@@ -1606,3 +1606,91 @@ Esses achados já estavam no documento (com status "deferido pro cleanup"), e o 
 
 Triagem com user define quais dos 5 prioritários entram nesta sessão.
 
+---
+
+# Fixes aplicados pós-auditoria (até 2026-05-24)
+
+Pós-auditoria das 7 fases, **mais 9 fixes** foram aplicados ao longo de sessões subsequentes ao build do MVP escolar. Marcando aqui pra ficar rastreável.
+
+## Sessão 2026-05-23
+
+### ✅ 🟠 Logout não revoga access token (Fase 1.B.alta.3 → CORRIGIDO)
+`AuthService.logout` agora bumpa `passwordChangedAt` do usuário após revogar refresh — invalida access tokens existentes imediatamente. Padrão alinhado com `alterarStatus(false)` e `alterarSenha`.
+
+### ✅ 🟠 Bloqueio empréstimo por atraso (P1 audit pendências)
+`EmprestimoService.registrar` e `ReservaService.reservar` agora bloqueiam novo empréstimo/reserva se aluno tem livro vencido. Mensagem clara HTTP 422. Repository novo: `countAtrasadosByAluno(alunoId, hoje)`. +2 testes unitários.
+
+### ✅ 🟠 PII mascarada em DTOs admin (Fase 5.B.alta.2 + 6.A.alta.2 → CORRIGIDO)
+`AlunoResumoDTO.mascarado(aluno)` retorna mesmo DTO com matrícula no formato `20270****`. Usado em:
+- `EmprestimoService.listarAtivos` (via `EmprestimoResponse.fromMascarado`)
+- `ReservaService.listarPendentes` (via `ReservaResponse.fromMascarado`)
+- Já existia em `DashboardAlertaDTO`
+
+Padrão LGPD §14 — telas visíveis a terceiros atrás do balcão da biblioteca.
+
+### ✅ 🟠 Renovação de empréstimo (P1 audit pendências)
+Novo endpoint `POST /emprestimos/{id}/renovacao` (BIB/ADMIN). Coluna `renovacoes` na entity + migration V14 + property `app.emprestimo.max-renovacoes` (default 2). 4 bloqueios: não-ATIVO, em atraso, limite atingido, reserva pendente de outro aluno. +5 testes.
+
+### ✅ 🟠 Edição e cancelamento de empréstimo (P1 audit pendências)
+- `PATCH /emprestimos/{id}` — edita `dataEmprestimo` e/ou `prazoDias` (recalcula vencimento). Validações: não-ATIVO, payload vazio, data no futuro, vencimento resultante no passado.
+- `DELETE /emprestimos/{id}` — marca CANCELADO (soft delete preservando FK de reservas) e devolve livro ao estoque.
+- Novo `SituacaoEmprestimo.CANCELADO` + migration V15 atualizando CHECK constraint.
+- Eventos `EMPRESTIMO_EDITADO` e `EMPRESTIMO_CANCELADO` na auditoria. +7 testes.
+
+### ✅ 🟠 XSS stored em `Usuario.nome` (Fase 7.X.alta.1 → JÁ ESTAVA CORRIGIDO antes da sessão; confirmado mantido)
+`@Pattern("^[\\p{L}\\p{N} .,'\\-]+$")` em `AtualizarPerfilRequest.nome` e `CriarUsuarioRequest.nome` + migration V13 que sanitiza dados legados (regex strip `[<>]`).
+
+## Sessão 2026-05-24
+
+### ✅ 🟡 Caddyfile com headers de segurança modernos (Fase 4.D/6.B → CORRIGIDO)
+Arquivo `Caddyfile` (raiz) adicionou na borda HTTPS:
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()`
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Resource-Policy: same-site`
+- `Cache-Control: no-cache, no-store, must-revalidate` em `/index.html`
+- Remove `Server` e `X-Powered-By` headers (reconnaissance)
+
+> **CSP completo (img-src, script-src, etc.)** ainda deferido — precisa testar pra não quebrar AntD inline styles.
+
+### ✅ Backup de dumps antigos com hashes BCrypt removidos do git
+`backups/liber-20260522-141942.sql` (46 KB) e `backups/dump.err` removidos do repo público no commit `8fe8197`. Continham hashes BCrypt de usuários teste (admin, bibliotecários, alunos seed) — risco baixo-médio mitigado. Histórico antigo ainda tem (não vale o esforço de `git filter-repo` pra dados de teste).
+
+### ✅ Deploy em produção GCP e2-micro + Neon Postgres
+Sistema rodando em **https://acervoliber.duckdns.org** desde 2026-05-24. Stack:
+- VM Google Cloud `acervo-liber1` (e2-micro, Ubuntu 26.04 LTS Minimal, 1 GB RAM + 2 GB swap)
+- Neon Postgres 16 free tier (AWS us-east-1, 0.5 GB)
+- Caddy 2 + Let's Encrypt + DuckDNS
+- Docker Compose com `docker-compose.gcp.yml` (sem serviço postgres local)
+
+---
+
+## Status final dos 7 fixes prioritários da Fase 7
+
+| # | Fix | Status |
+|---|---|---|
+| 1 | XSS stored em `nome` | ✅ Aplicado antes |
+| 2 | Pageable sem cap global | ✅ Já cobertura por `max-page-size=50` global |
+| 3 | PII de menores em DTOs admin | ✅ **Corrigido nesta sessão** |
+| 4 | `NoResourceFoundException` → 500 | ✅ Aplicado antes |
+| 5 | Logout não revoga access token | ✅ **Corrigido nesta sessão** |
+| 6 | CSP / headers modernos | 🟡 **Parcial nesta sessão** (Caddy adicionou COOP/CORP/Permissions-Policy; CSP completo deferido) |
+| 7 | CORS `allow-credentials=false` | ❌ Ainda aberto (1 linha, mas requer teste cuidadoso) |
+
+## Deferidos que continuam abertos (resumo)
+
+- 🟡 CORS `allow-credentials=true` → mudar pra `false` (1 linha + teste)
+- 🟡 Auditoria de leituras grandes (`GET /alunos?size=999` logado como sinal de scraping)
+- 🟡 Polyglot file upload — validar com `ImageIO.read` em vez de só magic bytes
+- 🟡 Mascarar PII em log/audit detail
+- 🟡 CSP completo (img-src whitelist, script-src self)
+- 🟡 `/actuator/info` removido em prod
+- 🟡 Mensagens de erro 422 não ecoam dados do request (log injection)
+- 🟢 Dependabot / Trivy
+- 🟢 Unificar mapas in-memory em Caffeine
+- 🟢 `TimeConfig.systemUTC()` + Clock em todos `Instant.now()`
+- 🟢 Handlers `HttpMessageNotReadableException` etc.
+
+Esses deferidos não bloqueiam produção. Próximas sessões podem atacar em ordem de impacto.
+
+
