@@ -19,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,10 +37,20 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
+    private final PasswordEncoder passwordEncoder;
     // Injetado como proxy request-scoped pelo Spring — resolve para o request atual.
     // Usado para extrair o IP do cliente no lockout por (email + IP), evitando
     // poisoning (atacante de um IP nao bloqueia a conta da vitima em outro IP).
     private final HttpServletRequest httpRequest;
+
+    /**
+     * Hash BCrypt valido pra rodar match dummy quando a matricula nao existe.
+     * Custa o mesmo tempo de um hash real e nao permite que o tempo de resposta
+     * diferencie "matricula existe, senha errada" de "matricula nao existe".
+     * Sem isto, atacante mede tempo e enumera matriculas de menores (LGPD).
+     */
+    private static final String DUMMY_HASH =
+        "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
     /** Login da equipe (ADMIN/BIBLIOTECARIO) — por e-mail. */
     @Transactional
@@ -55,8 +66,10 @@ public class AuthService {
             .filter(u -> u.getRole() == Role.ALUNO)
             .orElse(null);
         if (usuario == null) {
-            // Loga: tentativa de login com matricula inexistente. Investigação
-            // de probing/varredura: grep "Matricula inexistente" nos logs.
+            // Equaliza o tempo de resposta: roda BCrypt contra um hash dummy de
+            // modo que matricula inexistente custe ~ o mesmo que matricula com
+            // senha errada. Sem isto, atacante mede tempo e enumera matriculas.
+            passwordEncoder.matches(req.senha(), DUMMY_HASH);
             log.warn("Login falhou: matricula inexistente {} (IP={})", matricula, clientIp());
             throw new BadCredentialsException("Matricula ou senha incorretos");
         }

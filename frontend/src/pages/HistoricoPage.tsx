@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Card, Grid, List, Space, Table, Tag, Typography, type TableProps } from 'antd';
+import { Alert, Button, Card, Grid, List, Space, Table, Tag, Typography, type TableProps } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { listarHistorico } from '../api/emprestimos';
+import { mensagemDeErro } from '../api/http';
 import { StatusUrgenciaTag } from '../components/StatusUrgenciaTag';
 import type { EmprestimoResponse } from '../types/api';
 import { formatarData } from '../utils';
@@ -21,7 +22,7 @@ export default function HistoricoPage() {
   const isMobile = !screens.md;
   const [page, setPage] = useState(0);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['historico', page],
     queryFn: () => listarHistorico({ page, size: TAMANHO_PAGINA }),
   });
@@ -66,6 +67,21 @@ export default function HistoricoPage() {
   return (
     <>
       <Typography.Title level={3}>Histórico de empréstimos</Typography.Title>
+
+      {isError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Não foi possível carregar o histórico"
+          description={mensagemDeErro(error)}
+          action={
+            <Button size="small" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          }
+        />
+      )}
 
       {isMobile ? (
         <List

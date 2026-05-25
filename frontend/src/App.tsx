@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
 import { RouterProvider } from 'react-router-dom';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { router } from './router';
 
 /**
@@ -21,18 +22,24 @@ export const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // staleTime de 30s: evita refetch agressivo ao trocar de tela (eg.: voltar
+      // pra Dashboard depois de criar emprestimo). Sem isto, qualquer remount
+      // dispara nova requisicao mesmo com dado fresco no cache.
+      staleTime: 30_000,
     },
   },
 });
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={ptBR}>
-        <AntdApp>
-          <RouterProvider router={router} />
-        </AntdApp>
-      </ConfigProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ConfigProvider locale={ptBR}>
+          <AntdApp>
+            <RouterProvider router={router} />
+          </AntdApp>
+        </ConfigProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

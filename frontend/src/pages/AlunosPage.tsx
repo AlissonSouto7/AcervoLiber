@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -45,7 +46,7 @@ export default function AlunosPage() {
   const [drawerAberto, setDrawerAberto] = useState(false);
   const [editando, setEditando] = useState<AlunoResponse | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['alunos', termo, page],
     queryFn: () => listarAlunos({ termo, page, size: TAMANHO_PAGINA }),
   });
@@ -150,6 +151,21 @@ export default function AlunosPage() {
           </Button>
         </Space>
       </div>
+
+      {isError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Não foi possível carregar a lista de alunos"
+          description={mensagemDeErro(error)}
+          action={
+            <Button size="small" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          }
+        />
+      )}
 
       {isMobile ? (
         <List

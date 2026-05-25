@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -79,7 +80,7 @@ export default function LivrosPage() {
     };
   }, [capaArquivoPreview]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['livros', termo, page, pageSize],
     queryFn: () => listarLivros({ termo, page, size: pageSize }),
   });
@@ -196,6 +197,21 @@ export default function LivrosPage() {
           </Button>
         </Space>
       </div>
+
+      {isError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Não foi possível carregar a lista de livros"
+          description={mensagemDeErro(error)}
+          action={
+            <Button size="small" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          }
+        />
+      )}
 
       <List
         loading={isLoading}

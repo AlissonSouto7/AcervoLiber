@@ -21,7 +21,10 @@ import { mensagemDeErro } from '../api/http';
 import type { ReservaResponse } from '../types/api';
 import { formatarData } from '../utils';
 
-const PRAZO_PADRAO = 14;
+// Alinhado com o backend (app.emprestimo.prazo-padrao-dias=7). Sem isto, a
+// reserva confirmada virava emprestimo com 14d aqui mas o backend usava 7d,
+// confundindo bibliotecario e aluno sobre o prazo real.
+const PRAZO_PADRAO = 7;
 const TAMANHO_PAGINA = 20;
 
 /** Fila de reservas pendentes — bibliotecario confirma (vira emprestimo) ou recusa. */
