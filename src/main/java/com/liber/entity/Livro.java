@@ -8,9 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -60,15 +58,9 @@ public class Livro extends AuditableEntity {
 
     private Integer ano;
 
-    @NotNull
-    @Min(0)
-    @Column(name = "quantidade_exemplares", nullable = false)
-    private Integer quantidadeExemplares;
-
-    @NotNull
-    @Min(0)
-    @Column(name = "quantidade_disponivel", nullable = false)
-    private Integer quantidadeDisponivel;
+    // Quantidade total e disponivel sao DERIVADAS da tabela exemplares — count
+    // via ExemplarRepository. Antes da V18, eram colunas; agora viraram dado
+    // calculado pra evitar drift entre o contador e a realidade fisica.
 
     /**
      * URL da capa do livro. Pode ser uma URL externa (Google Books / Open Library,

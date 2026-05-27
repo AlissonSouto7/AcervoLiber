@@ -58,20 +58,22 @@ public class AuthService {
         return autenticar(req.email().trim().toLowerCase(), req.senha());
     }
 
-    /** Login do aluno — por matricula. Resolve a matricula para o usuario vinculado. */
+    /** Login do aluno — por CPF (V18). Resolve o CPF pro usuario vinculado. */
     @Transactional
     public LoginResponse loginAluno(LoginAlunoRequest req) {
-        String matricula = req.matricula().trim();
-        Usuario usuario = usuarioRepository.findByAlunoMatricula(matricula)
-            .filter(u -> u.getRole() == Role.ALUNO)
-            .orElse(null);
+        String cpf = com.liber.util.Cpf.normalize(req.cpf());
+        Usuario usuario = cpf == null ? null
+            : usuarioRepository.findByAlunoCpf(cpf)
+                .filter(u -> u.getRole() == Role.ALUNO)
+                .orElse(null);
         if (usuario == null) {
-            // Equaliza o tempo de resposta: roda BCrypt contra um hash dummy de
-            // modo que matricula inexistente custe ~ o mesmo que matricula com
-            // senha errada. Sem isto, atacante mede tempo e enumera matriculas.
+            // Equaliza o tempo de resposta: roda BCrypt contra um hash dummy
+            // pra CPF inexistente custar o mesmo que CPF valido com senha
+            // errada. Sem isto, atacante mede tempo e enumera CPFs.
             passwordEncoder.matches(req.senha(), DUMMY_HASH);
-            log.warn("Login falhou: matricula inexistente {} (IP={})", matricula, clientIp());
-            throw new BadCredentialsException("Matricula ou senha incorretos");
+            log.warn("Login falhou: CPF inexistente {} (IP={})",
+                cpf == null ? "<invalido>" : com.liber.util.Cpf.mask(cpf), clientIp());
+            throw new BadCredentialsException("CPF ou senha incorretos");
         }
         return autenticar(usuario.getEmail(), req.senha());
     }

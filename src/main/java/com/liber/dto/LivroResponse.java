@@ -9,8 +9,10 @@ public record LivroResponse(
     String autor,
     String isbn,
     Integer ano,
-    Integer quantidadeExemplares,
-    Integer quantidadeDisponivel,
+    /** Total de exemplares fisicos cadastrados (qualquer situacao exceto EXTRAVIADO). */
+    int exemplaresTotal,
+    /** Quantos desses estao DISPONIVEL pra emprestimo/reserva imediato. */
+    int exemplaresDisponiveis,
     String capaUrl,
     boolean capaManual,
     String sinopse,
@@ -18,15 +20,15 @@ public record LivroResponse(
     Instant updatedAt
 ) {
 
-    public static LivroResponse from(Livro livro) {
+    public static LivroResponse from(Livro livro, int exemplaresTotal, int exemplaresDisponiveis) {
         return new LivroResponse(
             livro.getId(),
             livro.getTitulo(),
             livro.getAutor(),
             livro.getIsbn(),
             livro.getAno(),
-            livro.getQuantidadeExemplares(),
-            livro.getQuantidadeDisponivel(),
+            exemplaresTotal,
+            exemplaresDisponiveis,
             livro.getCapaUrl(),
             livro.isCapaManual(),
             livro.getSinopse(),

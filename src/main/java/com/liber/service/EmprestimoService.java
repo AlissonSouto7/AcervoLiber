@@ -6,15 +6,16 @@ import com.liber.dto.EmprestimoRequest;
 import com.liber.dto.EmprestimoResponse;
 import com.liber.entity.Aluno;
 import com.liber.entity.Emprestimo;
-import com.liber.entity.Livro;
+import com.liber.entity.Exemplar;
 import com.liber.entity.SituacaoEmprestimo;
+import com.liber.entity.SituacaoExemplar;
 import com.liber.entity.StatusReserva;
 import com.liber.exception.EstoqueIndisponivelException;
 import com.liber.exception.RegraEmprestimoException;
 import com.liber.exception.ResourceNotFoundException;
 import com.liber.repository.AlunoRepository;
 import com.liber.repository.EmprestimoRepository;
-import com.liber.repository.LivroRepository;
+import com.liber.repository.ExemplarRepository;
 import com.liber.repository.ReservaRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -33,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmprestimoService {
 
     private final EmprestimoRepository emprestimoRepository;
-    private final LivroRepository livroRepository;
+    private final ExemplarRepository exemplarRepository;
     private final AlunoRepository alunoRepository;
     private final ReservaRepository reservaRepository;
     private final EmprestimoProperties props;
@@ -41,8 +42,6 @@ public class EmprestimoService {
 
     public List<EmprestimoResponse> listarAtivos() {
         LocalDate hoje = LocalDate.now(clock);
-        // Tela visivel a quem passar atras do balcao (visitante, pais de outros alunos)
-        // — matricula mascarada por LGPD §14 (dados de menores).
         return emprestimoRepository
             .findBySituacaoOrderByDataDevolucaoPrevistaAsc(SituacaoEmprestimo.ATIVO)
             .stream()
@@ -75,15 +74,11 @@ public class EmprestimoService {
     public EmprestimoResponse registrar(EmprestimoRequest req) {
         validarPrazo(req.prazoDias());
 
-        // SELECT FOR UPDATE no aluno — serializa requests concorrentes para o mesmo
-        // aluno, fechando a janela de corrida entre o count e o save.
         Aluno aluno = alunoRepository.findByIdForUpdate(req.alunoId())
             .orElseThrow(() -> ResourceNotFoundException.of("Aluno", req.alunoId()));
 
         LocalDate hoje = LocalDate.now(clock);
 
-        // Bloqueio por atraso: aluno com livro vencido nao pega novo no balcao.
-        // Regra de biblioteca escolar — sem isso o aluno acumula atrasos indefinidamente.
         long atrasados = emprestimoRepository.countAtrasadosByAluno(aluno.getId(), hoje);
         if (atrasados > 0) {
             throw new RegraEmprestimoException(
@@ -91,25 +86,19 @@ public class EmprestimoService {
                     .formatted(atrasados));
         }
 
-        // O limite por aluno NAO bloqueia emprestimo manual feito pelo staff —
-        // este endpoint so e chamado por bibliotecario/admin (aluno usa /reservas
-        // pra demandar, e la o limite e enforced em ReservaService). A direcao
-        // pode liberar manualmente livro extra pra aluno de confianca / projeto
-        // especial, sem precisar mexer na config global.
-
-        int atualizadas = livroRepository.decrementarEstoque(req.livroId());
-        if (atualizadas == 0) {
-            if (!livroRepository.existsById(req.livroId())) {
-                throw ResourceNotFoundException.of("Livro", req.livroId());
-            }
-            throw new EstoqueIndisponivelException(req.livroId());
+        // Carrega o exemplar e valida que esta DISPONIVEL. Trocamos a situacao
+        // atomicamente — se 2 bibliotecarios tentarem emprestar o mesmo exemplar
+        // ao mesmo tempo, @Version no Exemplar dispara OptimisticLockException.
+        Exemplar exemplar = exemplarRepository.findById(req.exemplarId())
+            .orElseThrow(() -> ResourceNotFoundException.of("Exemplar", req.exemplarId()));
+        if (exemplar.getSituacao() != SituacaoExemplar.DISPONIVEL) {
+            throw new EstoqueIndisponivelException(exemplar.getLivro().getId());
         }
-
-        Livro livro = livroRepository.findById(req.livroId())
-            .orElseThrow(() -> ResourceNotFoundException.of("Livro", req.livroId()));
+        exemplar.setSituacao(SituacaoExemplar.EMPRESTADO);
+        exemplarRepository.save(exemplar);
 
         Emprestimo emprestimo = Emprestimo.builder()
-            .livro(livro)
+            .exemplar(exemplar)
             .aluno(aluno)
             .dataEmprestimo(hoje)
             .prazoDias(req.prazoDias())
@@ -118,23 +107,13 @@ public class EmprestimoService {
             .build();
 
         Emprestimo salvo = emprestimoRepository.save(emprestimo);
-        log.info("Emprestimo registrado id={} livro={} aluno_matricula={} prazo={}d",
-            salvo.getId(), livro.getId(), aluno.getMatricula(), req.prazoDias());
+        log.info("Emprestimo registrado id={} exemplar={} ({}) aluno_id={} prazo={}d",
+            salvo.getId(), exemplar.getId(), exemplar.getCodigo(), aluno.getId(), req.prazoDias());
         return EmprestimoResponse.from(salvo, hoje);
     }
 
     /**
-     * Renova um empréstimo ATIVO, estendendo a data de devolucao prevista a partir
-     * de hoje + {@code prazoDias}. Incrementa o contador de renovacoes da entidade.
-     *
-     * <p>Bloqueios:
-     * <ul>
-     *   <li>Empréstimo nao-ATIVO (ja devolvido) — 422 "ja foi devolvido"</li>
-     *   <li>Empréstimo em atraso — 422 "devolva antes de renovar"</li>
-     *   <li>Limite de renovacoes atingido — 422 com contador</li>
-     *   <li>Existe reserva PENDENTE do mesmo livro por outro aluno — 422 "outro aluno aguardando"</li>
-     *   <li>Prazo solicitado acima do maximo — 422 padrao</li>
-     * </ul>
+     * Renova um emprestimo ATIVO, estendendo a data de devolucao prevista.
      */
     @Transactional
     public EmprestimoResponse renovar(Long emprestimoId, int prazoDias) {
@@ -160,10 +139,8 @@ public class EmprestimoService {
                     .formatted(props.maxRenovacoes()));
         }
 
-        // Bloqueia renovacao se outro aluno esta aguardando o mesmo livro — padrao
-        // de biblioteca: quem reservou tem prioridade sobre quem ja esta com o livro.
-        long reservasDoLivro = reservaRepository.countByLivroIdAndStatus(
-            emp.getLivro().getId(), StatusReserva.PENDENTE);
+        Long livroId = emp.getExemplar().getLivro().getId();
+        long reservasDoLivro = reservaRepository.countByLivroIdAndStatus(livroId, StatusReserva.PENDENTE);
         if (reservasDoLivro > 0) {
             throw new RegraEmprestimoException(
                 "Existe(m) %d reserva(s) pendente(s) para este livro. Renovacao bloqueada."
@@ -180,14 +157,6 @@ public class EmprestimoService {
         return EmprestimoResponse.from(salvo, hoje);
     }
 
-    /**
-     * Edita campos de um empréstimo ATIVO para corrigir lancamento errado.
-     * Aceita data de empréstimo e/ou prazo (apenas os enviados sao alterados).
-     * Recalcula automaticamente a data de devolucao prevista.
-     *
-     * <p>Bloqueios: empréstimo nao-ATIVO; payload vazio; data de empréstimo no
-     * futuro; vencimento resultante no passado.
-     */
     @Transactional
     public EmprestimoResponse editar(Long emprestimoId, EditarEmprestimoRequest req) {
         if (req.isVazio()) {
@@ -219,8 +188,6 @@ public class EmprestimoService {
         }
 
         LocalDate novoVencimento = emp.getDataEmprestimo().plusDays(emp.getPrazoDias());
-        // Coerencia: nao deixa o BIB salvar com vencimento no passado (criaria
-        // emprestimo ja atrasado pela edicao, confundindo as regras de bloqueio).
         if (novoVencimento.isBefore(hoje)) {
             throw new RegraEmprestimoException(
                 "Data de devolucao resultante (%s) esta no passado.".formatted(novoVencimento));
@@ -233,14 +200,6 @@ public class EmprestimoService {
         return EmprestimoResponse.from(salvo, hoje);
     }
 
-    /**
-     * Cancela um empréstimo (lancamento errado pelo bibliotecario). Marca como
-     * CANCELADO (soft delete, preserva FK de reservas confirmadas) e devolve
-     * o livro ao estoque. Diferente de devolucao — esse caminho indica que o
-     * empréstimo nunca devia ter existido.
-     *
-     * <p>Bloqueio: nao cancela empréstimo nao-ATIVO (DEVOLVIDO/CANCELADO).
-     */
     @Transactional
     public void cancelar(Long emprestimoId) {
         Emprestimo emp = emprestimoRepository.findById(emprestimoId)
@@ -251,18 +210,14 @@ public class EmprestimoService {
                 "So e possivel cancelar emprestimos ativos (situacao atual: " + emp.getSituacao() + ").");
         }
 
-        int atualizadas = livroRepository.incrementarEstoque(emp.getLivro().getId());
-        if (atualizadas == 0) {
-            // Drift de estoque: nao acumular silenciosamente — log nivel WARN
-            // garante visibilidade nos logs JSON da aplicacao.
-            log.warn("ESTOQUE_DIVERGENCIA: cancelamento do emprestimo id={} nao incrementou estoque do livro id={} (provavelmente ja no teto)",
-                emprestimoId, emp.getLivro().getId());
-        }
+        Exemplar exemplar = emp.getExemplar();
+        exemplar.setSituacao(SituacaoExemplar.DISPONIVEL);
+        exemplarRepository.save(exemplar);
 
         emp.setSituacao(SituacaoEmprestimo.CANCELADO);
         emprestimoRepository.save(emp);
-        log.info("Emprestimo cancelado id={} livro={} aluno_matricula={} (lancamento incorreto)",
-            emp.getId(), emp.getLivro().getId(), emp.getAluno().getMatricula());
+        log.info("Emprestimo cancelado id={} exemplar={} ({}) aluno_id={} (lancamento incorreto)",
+            emp.getId(), exemplar.getId(), exemplar.getCodigo(), emp.getAluno().getId());
     }
 
     @Transactional
@@ -275,10 +230,13 @@ public class EmprestimoService {
                 "Emprestimo ja devolvido em " + emprestimo.getDataDevolucaoEfetiva());
         }
 
-        int atualizadas = livroRepository.incrementarEstoque(emprestimo.getLivro().getId());
-        if (atualizadas == 0) {
-            log.warn("ESTOQUE_DIVERGENCIA: devolucao do emprestimo id={} nao incrementou estoque do livro id={} (provavelmente ja no teto)",
-                emprestimoId, emprestimo.getLivro().getId());
+        Exemplar exemplar = emprestimo.getExemplar();
+        if (exemplar.getSituacao() == SituacaoExemplar.EMPRESTADO) {
+            exemplar.setSituacao(SituacaoExemplar.DISPONIVEL);
+            exemplarRepository.save(exemplar);
+        } else {
+            log.warn("Devolucao do emprestimo id={} mas exemplar id={} estava em {} (esperado EMPRESTADO)",
+                emprestimoId, exemplar.getId(), exemplar.getSituacao());
         }
 
         LocalDate hoje = LocalDate.now(clock);
@@ -286,24 +244,24 @@ public class EmprestimoService {
         emprestimo.setDataDevolucaoEfetiva(hoje);
 
         Emprestimo salvo = emprestimoRepository.save(emprestimo);
-        log.info("Devolucao registrada emprestimo id={} livro={} aluno_matricula={}",
-            salvo.getId(), emprestimo.getLivro().getId(), emprestimo.getAluno().getMatricula());
+        log.info("Devolucao registrada emprestimo id={} exemplar={} ({}) aluno_id={}",
+            salvo.getId(), exemplar.getId(), exemplar.getCodigo(), emprestimo.getAluno().getId());
         return EmprestimoResponse.from(salvo, hoje);
     }
 
     /**
-     * Cria um emprestimo a partir de uma reserva confirmada. NAO decrementa o
-     * estoque — a reserva ja segurou o exemplar quando foi criada. NAO chamar
-     * fora de {@code ReservaService.confirmar} (visibilidade package-private —
-     * sem reserva valida, criaria empréstimo fantasma).
-     * <p>DEVE rodar dentro da transacao do chamador (propagation REQUIRED).
+     * Cria um emprestimo a partir de uma reserva confirmada. O exemplar ja foi
+     * separado pela reserva (situacao RESERVADO). NAO chamar fora de
+     * {@code ReservaService.confirmar}.
      */
     @Transactional
-    Emprestimo registrarParaReserva(Livro livro, Aluno aluno, int prazoDias) {
+    Emprestimo registrarParaReserva(Exemplar exemplar, Aluno aluno, int prazoDias) {
         validarPrazo(prazoDias);
         LocalDate hoje = LocalDate.now(clock);
+        exemplar.setSituacao(SituacaoExemplar.EMPRESTADO);
+        exemplarRepository.save(exemplar);
         Emprestimo emprestimo = Emprestimo.builder()
-            .livro(livro)
+            .exemplar(exemplar)
             .aluno(aluno)
             .dataEmprestimo(hoje)
             .prazoDias(prazoDias)
@@ -311,8 +269,8 @@ public class EmprestimoService {
             .situacao(SituacaoEmprestimo.ATIVO)
             .build();
         Emprestimo salvo = emprestimoRepository.save(emprestimo);
-        log.info("Emprestimo criado a partir de reserva id={} livro={} aluno={}",
-            salvo.getId(), livro.getId(), aluno.getId());
+        log.info("Emprestimo criado a partir de reserva id={} exemplar={} aluno_id={}",
+            salvo.getId(), exemplar.getId(), aluno.getId());
         return salvo;
     }
 

@@ -2,14 +2,15 @@ package com.liber.service;
 
 import com.liber.dto.LivroRequest;
 import com.liber.dto.LivroResponse;
+import com.liber.entity.Exemplar;
 import com.liber.entity.Livro;
 import com.liber.entity.LivroCapa;
-import com.liber.entity.SituacaoEmprestimo;
+import com.liber.entity.SituacaoExemplar;
 import com.liber.entity.StatusReserva;
 import com.liber.exception.BusinessException;
-import com.liber.exception.RegraEmprestimoException;
 import com.liber.exception.ResourceNotFoundException;
 import com.liber.repository.EmprestimoRepository;
+import com.liber.repository.ExemplarRepository;
 import com.liber.repository.LivroCapaRepository;
 import com.liber.repository.LivroRepository;
 import com.liber.repository.ReservaRepository;
@@ -38,6 +39,7 @@ public class LivroService {
     private static final long TAMANHO_MAX_CAPA = 2L * 1024 * 1024;
 
     private final LivroRepository livroRepository;
+    private final ExemplarRepository exemplarRepository;
     private final EmprestimoRepository emprestimoRepository;
     private final ReservaRepository reservaRepository;
     private final LivroCapaRepository livroCapaRepository;
@@ -45,41 +47,54 @@ public class LivroService {
     private final Clock clock;
 
     public Page<LivroResponse> listar(String termo, Pageable pageable) {
-        return livroRepository.buscar(termo, pageable).map(LivroResponse::from);
+        return livroRepository.buscar(termo, pageable).map(this::toResponse);
     }
 
     public LivroResponse buscarPorId(Long id) {
-        return LivroResponse.from(carregar(id));
+        return toResponse(carregar(id));
+    }
+
+    /** Monta LivroResponse com contadores de exemplares (derivados, calculados on-the-fly). */
+    private LivroResponse toResponse(Livro livro) {
+        long total = exemplarRepository.countByLivroId(livro.getId());
+        long disponivel = exemplarRepository.countByLivroIdAndSituacao(
+            livro.getId(), SituacaoExemplar.DISPONIVEL);
+        return LivroResponse.from(livro, (int) total, (int) disponivel);
     }
 
     @Transactional
     public LivroResponse cadastrar(LivroRequest req) {
-        // Normaliza ANTES de checar duplicidade — "978-8535914849" e "9788535914849"
-        // sao a mesma edicao; sem isso a checagem passava e a unique constraint
-        // do DB so disparava no flush (HTTP 500 generico em vez de 422 amigavel).
         String isbn = Isbn.normalize(req.isbn());
         if (isbn != null && livroRepository.existsByIsbn(isbn)) {
             throw new BusinessException("ISBN ja cadastrado: " + isbn);
         }
 
-        // A capa nao e resolvida sincronamente aqui — o CapaBackfillJob preenche
-        // depois. Isso evita segurar a conexao do DB por ate ~18s esperando o
-        // Google Books / Open Library quando a internet ou esses servicos estao
-        // lentos.
         Livro livro = Livro.builder()
             .titulo(req.titulo())
             .autor(req.autor())
             .isbn(isbn)
             .ano(req.ano())
-            .quantidadeExemplares(req.quantidadeExemplares())
-            .quantidadeDisponivel(req.quantidadeExemplares())
             .capaUrl(null)
             .sinopse(normalizarSinopse(req.sinopse()))
             .build();
-
         Livro salvo = livroRepository.save(livro);
-        log.info("Livro cadastrado id={} titulo='{}'", salvo.getId(), salvo.getTitulo());
-        return LivroResponse.from(salvo);
+
+        // Cria N exemplares iniciais com codigo auto-gerado da sequence
+        // (LIB-00001, LIB-00002, ...). Bibliotecario pode renomear depois pra
+        // bater com a etiqueta fisica que a escola ja tem.
+        int quantidade = req.exemplaresIniciais() == null ? 1 : req.exemplaresIniciais();
+        for (int i = 0; i < quantidade; i++) {
+            String codigo = exemplarRepository.proximoCodigoPadrao();
+            exemplarRepository.save(Exemplar.builder()
+                .livro(salvo)
+                .codigo(codigo)
+                .situacao(SituacaoExemplar.DISPONIVEL)
+                .build());
+        }
+
+        log.info("Livro cadastrado id={} titulo='{}' exemplares={}",
+            salvo.getId(), salvo.getTitulo(), quantidade);
+        return toResponse(salvo);
     }
 
     @Transactional
@@ -95,34 +110,15 @@ public class LivroService {
             throw new BusinessException("ISBN ja cadastrado: " + isbnNovo);
         }
 
-        // Exemplares "em uso" = emprestimos ATIVOS + reservas PENDENTES. As reservas
-        // pendentes tambem seguram um exemplar (decremento atomico ao reservar), entao
-        // precisam entrar na conta — senao o estoque disponivel diverge e exemplares
-        // somem ou aparecem indevidamente apos cancelar/recusar reservas.
-        long ativos = emprestimoRepository.countByLivroIdAndSituacao(id, SituacaoEmprestimo.ATIVO);
-        long reservasPendentes = reservaRepository.countByLivroIdAndStatus(id, StatusReserva.PENDENTE);
-        long emUso = ativos + reservasPendentes;
-        if (req.quantidadeExemplares() < emUso) {
-            throw new RegraEmprestimoException(
-                ("Total de exemplares (%d) nao pode ser menor que os exemplares em uso "
-                    + "— emprestimos ativos + reservas pendentes (%d)")
-                    .formatted(req.quantidadeExemplares(), emUso));
-        }
-
         livro.setTitulo(req.titulo());
         livro.setAutor(req.autor());
         livro.setIsbn(isbnNovo);
         livro.setAno(req.ano());
-        livro.setQuantidadeExemplares(req.quantidadeExemplares());
-        // Calculado direto a partir dos exemplares em uso — independente do estado
-        // anterior de quantidadeDisponivel (robusto contra eventuais drifts).
-        livro.setQuantidadeDisponivel(req.quantidadeExemplares() - (int) emUso);
         livro.setSinopse(normalizarSinopse(req.sinopse()));
 
         // ISBN, titulo ou autor mudou -> capa automatica fica obsoleta. Limpa para
-        // o CapaBackfillJob re-resolver em background; nao resolvemos sincronamente
-        // aqui para evitar segurar conexao do DB esperando o Google Books / Open
-        // Library. Capa enviada manualmente nunca e sobrescrita.
+        // o CapaBackfillJob re-resolver em background. Capa manual nunca e
+        // sobrescrita.
         boolean dadosDaCapaMudaram = !Objects.equals(isbnAntigo, isbnNovo)
             || !Objects.equals(tituloAntigo, req.titulo())
             || !Objects.equals(autorAntigo, req.autor());
@@ -130,8 +126,9 @@ public class LivroService {
             livro.setCapaUrl(null);
         }
 
+        Livro salvo = livroRepository.save(livro);
         log.info("Livro atualizado id={}", id);
-        return LivroResponse.from(livroRepository.save(livro));
+        return toResponse(salvo);
     }
 
     @Transactional
@@ -143,14 +140,15 @@ public class LivroService {
             throw new BusinessException(
                 "Nao e possivel remover livro com historico de emprestimos. Mantenha-o para preservar o historico.");
         }
-        // Reservas PENDENTE e CONFIRMADA seguram um exemplar — deletar agora deixaria
-        // a reserva orfa (FK CASCADE removeria sem aviso, descalibrando o estoque
-        // exibido pro aluno).
+        // Reservas PENDENTE e CONFIRMADA seguram um exemplar.
         if (reservaRepository.countByLivroIdAndStatus(id, StatusReserva.PENDENTE) > 0
                 || reservaRepository.countByLivroIdAndStatus(id, StatusReserva.CONFIRMADA) > 0) {
             throw new BusinessException(
                 "Nao e possivel remover livro com reservas pendentes ou confirmadas. Cancele as reservas antes.");
         }
+        // Apaga exemplares antes (FK RESTRICT)
+        exemplarRepository.findByLivroIdOrderByCodigoAsc(id)
+            .forEach(e -> exemplarRepository.deleteById(e.getId()));
         livroRepository.deleteById(id);
         log.info("Livro removido id={}", id);
     }
@@ -184,9 +182,6 @@ public class LivroService {
 
     /**
      * Define a sinopse vinda do backfill — so se o livro AINDA nao tiver sinopse.
-     * Sinopse cadastrada manualmente pelo bibliotecario sempre vence (se quiser
-     * que o automatico re-popule, basta limpar a sinopse pela tela e o backfill
-     * preenche no proximo ciclo).
      */
     @Transactional
     public void definirSinopse(Long id, String sinopse) {
@@ -202,11 +197,6 @@ public class LivroService {
         });
     }
 
-    /**
-     * Vazio/branco vira null (rule simples pro check "tem sinopse?"). Trunca a
-     * 2000 caracteres como defesa extra alem do {@code @Size} do request — o
-     * backfill nao passa pelo validator do Bean Validation.
-     */
     private static String normalizarSinopse(String sinopse) {
         if (sinopse == null) {
             return null;
@@ -218,10 +208,6 @@ public class LivroService {
         return t.length() > 2000 ? t.substring(0, 2000) : t;
     }
 
-    /**
-     * Substitui a capa do livro por uma imagem enviada manualmente. A partir daqui
-     * a resolucao automatica nao mexe mais na capa (ate ela ser removida).
-     */
     @Transactional
     public LivroResponse enviarCapa(Long id, byte[] dados, String contentType) {
         Livro livro = carregar(id);
@@ -235,9 +221,6 @@ public class LivroService {
         if (!TIPOS_IMAGEM_PERMITIDOS.contains(tipo)) {
             throw new BusinessException("Formato invalido. Envie uma imagem JPG, PNG ou WEBP.");
         }
-        // O Content-Type acima e informado pelo cliente e trivialmente forjavel.
-        // A validacao que vale e a dos magic bytes do conteudo real — e o tipo
-        // armazenado/servido depois e o detectado, nunca o informado pelo cliente.
         String tipoReal = detectarTipoImagem(dados);
         if (tipoReal == null) {
             throw new BusinessException(
@@ -251,25 +234,19 @@ public class LivroService {
         capa.setAtualizadoEm(Instant.now(clock));
         livroCapaRepository.save(capa);
 
-        // O sufixo ?v= força o navegador a recarregar a imagem apos uma troca.
         livro.setCapaUrl("/api/v1/livros/" + id + "/capa-imagem?v=" + System.currentTimeMillis());
         livro.setCapaManual(true);
         Livro salvo = livroRepository.save(livro);
         log.info("Capa manual enviada para livro id={} ({} bytes)", id, dados.length);
-        return LivroResponse.from(salvo);
+        return toResponse(salvo);
     }
 
-    /** Imagem da capa enviada manualmente — para o endpoint que serve a imagem. */
     @Transactional(readOnly = true)
     public LivroCapa lerCapaImagem(Long id) {
         return livroCapaRepository.findById(id)
             .orElseThrow(() -> ResourceNotFoundException.of("Capa do livro", id));
     }
 
-    /**
-     * Remove a capa manual e volta para a capa automatica (Google Books / Open
-     * Library), re-resolvendo na hora.
-     */
     @Transactional
     public LivroResponse removerCapaManual(Long id) {
         Livro livro = carregar(id);
@@ -280,14 +257,9 @@ public class LivroService {
         livro.setCapaUrl(capaService.resolverCapa(livro.getIsbn(), livro.getTitulo(), livro.getAutor()));
         Livro salvo = livroRepository.save(livro);
         log.info("Capa manual removida do livro id={} — voltou para a automatica", id);
-        return LivroResponse.from(salvo);
+        return toResponse(salvo);
     }
 
-    /**
-     * Detecta o tipo de imagem pelos magic bytes do conteudo — sem confiar no
-     * Content-Type informado pelo cliente. Retorna o mime type ou {@code null}
-     * se o arquivo nao for um JPG, PNG ou WEBP genuino.
-     */
     private static String detectarTipoImagem(byte[] d) {
         if (d.length >= 3
                 && (d[0] & 0xFF) == 0xFF && (d[1] & 0xFF) == 0xD8 && (d[2] & 0xFF) == 0xFF) {

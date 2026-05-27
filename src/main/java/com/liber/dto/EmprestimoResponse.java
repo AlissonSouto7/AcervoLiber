@@ -19,7 +19,7 @@ public record EmprestimoResponse(
     public static EmprestimoResponse from(Emprestimo emprestimo, LocalDate hoje) {
         return new EmprestimoResponse(
             emprestimo.getId(),
-            LivroResumoDTO.from(emprestimo.getLivro()),
+            LivroResumoDTO.from(emprestimo.getExemplar().getLivro(), emprestimo.getExemplar()),
             AlunoResumoDTO.from(emprestimo.getAluno()),
             emprestimo.getDataEmprestimo(),
             emprestimo.getPrazoDias(),
@@ -37,7 +37,7 @@ public record EmprestimoResponse(
     public static EmprestimoResponse fromMascarado(Emprestimo emprestimo, LocalDate hoje) {
         return new EmprestimoResponse(
             emprestimo.getId(),
-            LivroResumoDTO.from(emprestimo.getLivro()),
+            LivroResumoDTO.from(emprestimo.getExemplar().getLivro(), emprestimo.getExemplar()),
             AlunoResumoDTO.mascarado(emprestimo.getAluno()),
             emprestimo.getDataEmprestimo(),
             emprestimo.getPrazoDias(),

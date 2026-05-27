@@ -20,19 +20,24 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
 
     long countByAlunoIdAndSituacao(Long alunoId, SituacaoEmprestimo situacao);
 
-    long countByLivroIdAndSituacao(Long livroId, SituacaoEmprestimo situacao);
+    boolean existsByExemplarId(Long exemplarId);
 
-    boolean existsByLivroId(Long livroId);
+    /** Indica se ha qualquer emprestimo (ativo ou historico) com algum exemplar do livro. */
+    @Query("""
+        SELECT CASE WHEN COUNT(e) > 0 THEN true ELSE false END
+        FROM Emprestimo e WHERE e.exemplar.livro.id = :livroId
+        """)
+    boolean existsByLivroId(@Param("livroId") Long livroId);
 
     boolean existsByAlunoId(Long alunoId);
 
-    @EntityGraph(attributePaths = {"livro", "aluno"})
+    @EntityGraph(attributePaths = {"exemplar.livro", "aluno"})
     List<Emprestimo> findBySituacaoOrderByDataDevolucaoPrevistaAsc(SituacaoEmprestimo situacao);
 
-    @EntityGraph(attributePaths = {"livro", "aluno"})
+    @EntityGraph(attributePaths = {"exemplar.livro", "aluno"})
     Page<Emprestimo> findAllByOrderByDataEmprestimoDesc(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"livro", "aluno"})
+    @EntityGraph(attributePaths = {"exemplar.livro", "aluno"})
     Page<Emprestimo> findByAlunoIdOrderByDataEmprestimoDesc(Long alunoId, Pageable pageable);
 
     @Query("""
@@ -54,7 +59,7 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
         SELECT new com.liber.dto.LivroRankingDTO(
             l.id, l.titulo, l.autor, COUNT(e)
         )
-        FROM Emprestimo e JOIN e.livro l
+        FROM Emprestimo e JOIN e.exemplar ex JOIN ex.livro l
         GROUP BY l.id, l.titulo, l.autor
         ORDER BY COUNT(e) DESC, l.titulo ASC
         """)

@@ -40,11 +40,16 @@ public class Aluno extends AuditableEntity {
     @ToString.Include
     private Long id;
 
+    /**
+     * CPF do aluno — 11 digitos numericos, validado com digito verificador na
+     * camada de servico. Substituiu a matricula em V18: a escola nao tem
+     * matricula formal pros alunos; CPF e o que o aluno sabe de cor.
+     */
     @NotBlank
-    @Size(max = 30)
-    @Column(nullable = false, unique = true, length = 30)
+    @Size(min = 11, max = 11)
+    @Column(nullable = false, unique = true, length = 11)
     @ToString.Include
-    private String matricula;
+    private String cpf;
 
     @NotBlank
     @Size(max = 150)

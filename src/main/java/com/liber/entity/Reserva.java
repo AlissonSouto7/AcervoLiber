@@ -34,7 +34,8 @@ import lombok.ToString;
     indexes = {
         @Index(name = "idx_reservas_status", columnList = "status"),
         @Index(name = "idx_reservas_aluno", columnList = "aluno_id"),
-        @Index(name = "idx_reservas_livro", columnList = "livro_id")
+        @Index(name = "idx_reservas_livro", columnList = "livro_id"),
+        @Index(name = "idx_reservas_exemplar", columnList = "exemplar_id")
     }
 )
 @Getter
@@ -56,6 +57,15 @@ public class Reserva extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "livro_id", nullable = false)
     private Livro livro;
+
+    /**
+     * Exemplar especifico segurado pela reserva. Preenchido ja na criacao (o
+     * primeiro DISPONIVEL e tomado pra evitar over-booking de copias). Na
+     * confirmacao, o bibliotecario pode trocar antes de finalizar.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exemplar_id")
+    private Exemplar exemplar;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

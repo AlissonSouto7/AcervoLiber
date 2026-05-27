@@ -6,9 +6,11 @@ import com.liber.dto.ReservaResponse;
 import com.liber.dto.ReservaResumoResponse;
 import com.liber.entity.Aluno;
 import com.liber.entity.Emprestimo;
+import com.liber.entity.Exemplar;
 import com.liber.entity.Livro;
 import com.liber.entity.Reserva;
 import com.liber.entity.SituacaoEmprestimo;
+import com.liber.entity.SituacaoExemplar;
 import com.liber.entity.StatusReserva;
 import com.liber.entity.Usuario;
 import com.liber.exception.BusinessException;
@@ -16,6 +18,7 @@ import com.liber.exception.EstoqueIndisponivelException;
 import com.liber.exception.ResourceNotFoundException;
 import com.liber.repository.AlunoRepository;
 import com.liber.repository.EmprestimoRepository;
+import com.liber.repository.ExemplarRepository;
 import com.liber.repository.LivroRepository;
 import com.liber.repository.ReservaRepository;
 import com.liber.repository.UsuarioRepository;
@@ -33,10 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Reservas de livros pelos alunos.
  *
- * <p>Fluxo: o aluno reserva um livro disponivel (a reserva PENDENTE segura um
- * exemplar via decremento atomico do estoque). O bibliotecario confirma —
- * gerando um emprestimo sem novo decremento — ou recusa. O aluno pode cancelar
- * enquanto pendente. Reservas nao retiradas expiram pelo job de expiracao.
+ * <p>Fluxo: o aluno reserva um livro disponivel (a reserva PENDENTE separa um
+ * exemplar especifico — o primeiro DISPONIVEL — e marca-o como RESERVADO). O
+ * bibliotecario confirma e o exemplar vira EMPRESTADO, ou recusa e ele volta
+ * pra DISPONIVEL. Reservas nao retiradas expiram automaticamente pelo job.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +49,7 @@ public class ReservaService {
 
     private final ReservaRepository reservaRepository;
     private final LivroRepository livroRepository;
+    private final ExemplarRepository exemplarRepository;
     private final AlunoRepository alunoRepository;
     private final UsuarioRepository usuarioRepository;
     private final EmprestimoRepository emprestimoRepository;
@@ -60,7 +64,6 @@ public class ReservaService {
     public ReservaResponse reservar(String emailUsuario, Long livroId) {
         Long alunoId = resolverAlunoId(emailUsuario);
 
-        // SELECT FOR UPDATE no aluno — serializa reservas concorrentes do mesmo aluno
         Aluno aluno = alunoRepository.findByIdForUpdate(alunoId)
             .orElseThrow(() -> ResourceNotFoundException.of("Aluno", alunoId));
 
@@ -70,8 +73,6 @@ public class ReservaService {
 
         LocalDate hoje = LocalDate.now(clock);
 
-        // Mesmo bloqueio do emprestimo direto: aluno em atraso nao pode nem reservar.
-        // Sem isso, ele contornaria o bloqueio do balcao indo pelo portal de reservas.
         long atrasados = emprestimoRepository.countAtrasadosByAluno(alunoId, hoje);
         if (atrasados > 0) {
             throw new BusinessException(
@@ -87,27 +88,27 @@ public class ReservaService {
                 "Voce atingiu o limite de %d livros entre emprestimos e reservas.".formatted(limite));
         }
 
-        // Segura um exemplar (decremento atomico, igual ao emprestimo)
-        int atualizadas = livroRepository.decrementarEstoque(livroId);
-        if (atualizadas == 0) {
-            if (!livroRepository.existsById(livroId)) {
-                throw ResourceNotFoundException.of("Livro", livroId);
-            }
-            throw new EstoqueIndisponivelException(livroId);
-        }
+        // Reserva um exemplar especifico — o primeiro DISPONIVEL do livro, com
+        // lock pessimista pra evitar race com outra reserva simultanea.
         Livro livro = livroRepository.findById(livroId)
             .orElseThrow(() -> ResourceNotFoundException.of("Livro", livroId));
+        Exemplar exemplar = exemplarRepository.findPrimeiroDisponivelForUpdate(livroId)
+            .orElseThrow(() -> new EstoqueIndisponivelException(livroId));
+        exemplar.setSituacao(SituacaoExemplar.RESERVADO);
+        exemplarRepository.save(exemplar);
 
         Reserva reserva = Reserva.builder()
             .livro(livro)
+            .exemplar(exemplar)
             .aluno(aluno)
             .status(StatusReserva.PENDENTE)
             .dataReserva(hoje)
             .dataExpiracao(hoje.plusDays(reservaProps.validadeDias()))
             .build();
         Reserva salva = reservaRepository.save(reserva);
-        log.info("Reserva criada id={} livro={} aluno_matricula={} validade={}",
-            salva.getId(), livroId, aluno.getMatricula(), salva.getDataExpiracao());
+        log.info("Reserva criada id={} livro={} exemplar={} ({}) aluno_id={} validade={}",
+            salva.getId(), livroId, exemplar.getId(), exemplar.getCodigo(),
+            aluno.getId(), salva.getDataExpiracao());
         return ReservaResponse.from(salva);
     }
 
@@ -117,7 +118,6 @@ public class ReservaService {
             .map(ReservaResponse::from);
     }
 
-    /** Resumo de emprestimos/reservas do aluno e o limite — alimenta o catalogo. */
     public ReservaResumoResponse resumoDoAluno(String emailUsuario) {
         Long alunoId = resolverAlunoId(emailUsuario);
         long ativos = emprestimoRepository.countByAlunoIdAndSituacao(alunoId, SituacaoEmprestimo.ATIVO);
@@ -136,16 +136,14 @@ public class ReservaService {
         reserva.setStatus(StatusReserva.CANCELADA);
         reserva.setDataResolucao(Instant.now(clock));
         reservaRepository.save(reserva);
-        devolverExemplar(reserva, "cancelamento");
-        log.info("Reserva cancelada id={} livro={} aluno_matricula={}",
-            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula());
+        liberarExemplar(reserva, "cancelamento");
+        log.info("Reserva cancelada id={} livro={} aluno_id={}",
+            reservaId, reserva.getLivro().getId(), reserva.getAluno().getId());
     }
 
     // ---------- Acoes do bibliotecario ----------
 
     public Page<ReservaResponse> listarPendentes(Pageable pageable) {
-        // Fila do bibliotecario visivel a quem passar atras do balcao — matricula
-        // mascarada por LGPD §14. Nome+turma continuam para identificacao.
         return reservaRepository.findByStatusOrderByDataReservaAsc(StatusReserva.PENDENTE, pageable)
             .map(ReservaResponse::fromMascarado);
     }
@@ -153,14 +151,14 @@ public class ReservaService {
     @Transactional
     public ReservaResponse confirmar(Long reservaId, int prazoDias) {
         Reserva reserva = carregarPendente(reservaId);
-        // O exemplar ja foi segurado pela reserva — o emprestimo NAO decrementa de novo
+        // O exemplar ja esta separado pela reserva (situacao RESERVADO).
         Emprestimo emprestimo = emprestimoService.registrarParaReserva(
-            reserva.getLivro(), reserva.getAluno(), prazoDias);
+            reserva.getExemplar(), reserva.getAluno(), prazoDias);
         reserva.setStatus(StatusReserva.CONFIRMADA);
         reserva.setDataResolucao(Instant.now(clock));
         reserva.setEmprestimo(emprestimo);
-        log.info("Reserva confirmada id={} livro={} aluno_matricula={} -> emprestimo id={} prazo={}d",
-            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula(),
+        log.info("Reserva confirmada id={} exemplar={} aluno_id={} -> emprestimo id={} prazo={}d",
+            reservaId, reserva.getExemplar().getId(), reserva.getAluno().getId(),
             emprestimo.getId(), prazoDias);
         Reserva salva = reservaRepository.save(reserva);
         return ReservaResponse.from(salva);
@@ -171,9 +169,9 @@ public class ReservaService {
         Reserva reserva = carregarPendente(reservaId);
         reserva.setStatus(StatusReserva.RECUSADA);
         reserva.setDataResolucao(Instant.now(clock));
-        devolverExemplar(reserva, "recusa");
-        log.info("Reserva recusada id={} livro={} aluno_matricula={}",
-            reservaId, reserva.getLivro().getId(), reserva.getAluno().getMatricula());
+        liberarExemplar(reserva, "recusa");
+        log.info("Reserva recusada id={} livro={} aluno_id={}",
+            reservaId, reserva.getLivro().getId(), reserva.getAluno().getId());
         Reserva salva = reservaRepository.save(reserva);
         return ReservaResponse.from(salva);
     }
@@ -188,13 +186,13 @@ public class ReservaService {
         for (Reserva reserva : vencidas) {
             reserva.setStatus(StatusReserva.EXPIRADA);
             reserva.setDataResolucao(agora);
-            devolverExemplar(reserva, "expiracao");
+            liberarExemplar(reserva, "expiracao");
         }
         reservaRepository.saveAll(vencidas);
         for (Reserva reserva : vencidas) {
-            log.info("Reserva expirada id={} livro={} aluno_matricula={} expirou_em={}",
+            log.info("Reserva expirada id={} livro={} aluno_id={} expirou_em={}",
                 reserva.getId(), reserva.getLivro().getId(),
-                reserva.getAluno().getMatricula(), reserva.getDataExpiracao());
+                reserva.getAluno().getId(), reserva.getDataExpiracao());
         }
         return vencidas.size();
     }
@@ -202,16 +200,23 @@ public class ReservaService {
     // ---------- Apoio ----------
 
     /**
-     * Devolve ao estoque o exemplar que a reserva segurava (cancelamento, recusa
-     * ou expiracao). Se o incremento nao afetar linhas, registra um alerta — isso
-     * indica divergencia de estoque que precisa de correcao manual.
+     * Libera o exemplar que a reserva segurava de volta pra DISPONIVEL
+     * (cancelamento, recusa ou expiracao). Se o exemplar estiver em outro
+     * estado (drift), apenas loga sem falhar.
      */
-    private void devolverExemplar(Reserva reserva, String motivo) {
-        int devolvidas = livroRepository.incrementarEstoque(reserva.getLivro().getId());
-        if (devolvidas == 0) {
-            log.warn("Estoque NAO devolvido na {} da reserva id={} (livro id={}): "
-                    + "incremento nao afetou linhas — divergencia de estoque, verificar manualmente",
-                motivo, reserva.getId(), reserva.getLivro().getId());
+    private void liberarExemplar(Reserva reserva, String motivo) {
+        Exemplar exemplar = reserva.getExemplar();
+        if (exemplar == null) {
+            log.warn("Reserva id={} sem exemplar associado na {} — verificar manualmente",
+                reserva.getId(), motivo);
+            return;
+        }
+        if (exemplar.getSituacao() == SituacaoExemplar.RESERVADO) {
+            exemplar.setSituacao(SituacaoExemplar.DISPONIVEL);
+            exemplarRepository.save(exemplar);
+        } else {
+            log.warn("Reserva id={} {}: exemplar id={} estava em {} (esperado RESERVADO)",
+                reserva.getId(), motivo, exemplar.getId(), exemplar.getSituacao());
         }
     }
 

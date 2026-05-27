@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -32,31 +31,4 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
                OR l.isbn = :termo)
         """)
     Page<Livro> buscar(@Param("termo") String termo, Pageable pageable);
-
-    /**
-     * Decremento atomico do estoque. Retorna 1 se conseguiu decrementar, 0 caso contrario
-     * (livro inexistente ou sem exemplares disponiveis). Evita corrida em emprestimos concorrentes
-     * sem precisar de lock pessimista — a propria clausula WHERE garante a invariante.
-     */
-    @Modifying
-    @Query("""
-        UPDATE Livro l
-        SET l.quantidadeDisponivel = l.quantidadeDisponivel - 1,
-            l.version = l.version + 1
-        WHERE l.id = :id AND l.quantidadeDisponivel > 0
-        """)
-    int decrementarEstoque(@Param("id") Long id);
-
-    /**
-     * Incremento atomico no retorno. Guarda contra exceder o total de exemplares (defesa
-     * em profundidade caso o estado divirja).
-     */
-    @Modifying
-    @Query("""
-        UPDATE Livro l
-        SET l.quantidadeDisponivel = l.quantidadeDisponivel + 1,
-            l.version = l.version + 1
-        WHERE l.id = :id AND l.quantidadeDisponivel < l.quantidadeExemplares
-        """)
-    int incrementarEstoque(@Param("id") Long id);
 }

@@ -6,8 +6,13 @@ import jakarta.validation.constraints.NotNull;
 
 public record EmprestimoRequest(
 
+    /**
+     * ID do exemplar fisico que esta sendo emprestado (codigo de tombamento da
+     * escola). O bibliotecario escolhe a copia exata na tela — antes era so
+     * "qualquer copia do livro X", agora cada copia tem identidade propria.
+     */
     @NotNull
-    Long livroId,
+    Long exemplarId,
 
     @NotNull
     Long alunoId,

@@ -25,6 +25,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     /** Verifica se um aluno ja possui acesso ao sistema. */
     boolean existsByAlunoId(Long alunoId);
 
-    /** Resolve o usuario de um aluno pela matricula — usado no login do aluno. */
-    Optional<Usuario> findByAlunoMatricula(String matricula);
+    /** Resolve o usuario de um aluno pelo CPF — usado no login do aluno. */
+    Optional<Usuario> findByAlunoCpf(String cpf);
 }

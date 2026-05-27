@@ -31,7 +31,7 @@ import lombok.ToString;
         @Index(name = "idx_emprestimos_situacao", columnList = "situacao"),
         @Index(name = "idx_emprestimos_data_devolucao_prevista", columnList = "data_devolucao_prevista"),
         @Index(name = "idx_emprestimos_aluno_situacao", columnList = "aluno_id,situacao"),
-        @Index(name = "idx_emprestimos_livro", columnList = "livro_id")
+        @Index(name = "idx_emprestimos_exemplar", columnList = "exemplar_id")
     }
 )
 @Getter
@@ -49,10 +49,15 @@ public class Emprestimo extends AuditableEntity {
     @ToString.Include
     private Long id;
 
+    /**
+     * Exemplar fisico emprestado. Saber a copia exata (e nao apenas o titulo)
+     * permite responsabilizar pelo extravio: se o aluno perder o livro, a escola
+     * sabe que foi o exemplar de codigo X que ficou faltando do acervo.
+     */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "livro_id", nullable = false)
-    private Livro livro;
+    @JoinColumn(name = "exemplar_id", nullable = false)
+    private Exemplar exemplar;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

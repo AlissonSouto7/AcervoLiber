@@ -14,6 +14,7 @@ import com.liber.repository.AlunoRepository;
 import com.liber.repository.EmprestimoRepository;
 import com.liber.repository.ReservaRepository;
 import com.liber.repository.UsuarioRepository;
+import com.liber.util.Cpf;
 import java.text.Normalizer;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,10 @@ public class AlunoService {
     private final PasswordEncoder passwordEncoder;
 
     public Page<AlunoResponse> listar(String termo, Pageable pageable) {
-        return alunoRepository.buscar(termo, pageable)
+        // Normaliza termo de busca: se for CPF formatado (123.456.789-01), busca
+        // por digitos puros (porque no banco gravamos so digitos).
+        String termoNorm = normalizarTermoBusca(termo);
+        return alunoRepository.buscar(termoNorm, pageable)
             .map(a -> AlunoResponse.from(a, contarEmprestimosAtivos(a.getId())));
     }
 
@@ -49,19 +53,19 @@ public class AlunoService {
 
     @Transactional
     public AlunoResponse cadastrar(AlunoRequest req) {
-        String matricula = req.matricula().trim();
-        if (alunoRepository.existsByMatricula(matricula)) {
-            throw new BusinessException("Matricula ja cadastrada: " + matricula);
+        String cpf = validarENormalizarCpf(req.cpf());
+        if (alunoRepository.existsByCpf(cpf)) {
+            throw new BusinessException("CPF ja cadastrado.");
         }
 
         Aluno aluno = Aluno.builder()
-            .matricula(matricula)
+            .cpf(cpf)
             .nome(req.nome().trim())
             .turma(req.turma().trim())
             .build();
 
         Aluno salvo = alunoRepository.save(aluno);
-        log.info("Aluno cadastrado id={} matricula={}", salvo.getId(), salvo.getMatricula());
+        log.info("Aluno cadastrado id={} cpf={}", salvo.getId(), Cpf.mask(salvo.getCpf()));
         return AlunoResponse.from(salvo, 0L);
     }
 
@@ -69,13 +73,12 @@ public class AlunoService {
     public AlunoResponse atualizar(Long id, AlunoRequest req) {
         Aluno aluno = carregar(id);
 
-        String matriculaNova = req.matricula().trim();
-        if (!matriculaNova.equals(aluno.getMatricula())
-                && alunoRepository.existsByMatricula(matriculaNova)) {
-            throw new BusinessException("Matricula ja cadastrada: " + matriculaNova);
+        String cpfNovo = validarENormalizarCpf(req.cpf());
+        if (!cpfNovo.equals(aluno.getCpf()) && alunoRepository.existsByCpf(cpfNovo)) {
+            throw new BusinessException("CPF ja cadastrado.");
         }
 
-        aluno.setMatricula(matriculaNova);
+        aluno.setCpf(cpfNovo);
         aluno.setNome(req.nome().trim());
         aluno.setTurma(req.turma().trim());
 
@@ -89,9 +92,6 @@ public class AlunoService {
         if (!alunoRepository.existsById(id)) {
             throw ResourceNotFoundException.of("Aluno", id);
         }
-        // Pre-checagens defensivas com mensagens amigaveis — sem isso, a remocao
-        // viola FK e o GlobalExceptionHandler retorna 409 "Conflito de dados" generico
-        // que o bibliotecario nao consegue diagnosticar.
         if (emprestimoRepository.existsByAlunoId(id)) {
             throw new BusinessException(
                 "Nao e possivel remover aluno com historico de emprestimos. Mantenha-o para preservar o historico.");
@@ -111,51 +111,44 @@ public class AlunoService {
     /**
      * Auto-cadastro do aluno na tela publica de login.
      *
-     * <p>Diferente de {@link #criarAcesso} (chamado pelo bibliotecario), aqui o
-     * proprio aluno escolhe a senha. Pra evitar sequestro de conta (atacante que
-     * sabe a matricula do colega), exigimos que:
+     * <p>Pra evitar sequestro de conta exigimos que:
      * <ul>
-     *   <li>matricula existe (aluno foi pre-cadastrado pela escola)</li>
-     *   <li>nome do request bate com cadastro (normalizado: case-insensitive, sem acentos)</li>
+     *   <li>CPF existe (aluno foi pre-cadastrado pela escola)</li>
+     *   <li>nome do request bate com cadastro (normalizado: sem acentos, lowercase)</li>
      *   <li>aluno ainda nao tem Usuario vinculado</li>
      * </ul>
-     *
-     * <p>Mensagem de erro neutra ("dados nao conferem") em caso de matricula
-     * inexistente OU nome divergente — nao revela se a matricula foi cadastrada.
      */
     @Transactional
     public UsuarioResponse autoRegistrar(RegisterAlunoRequest req) {
-        String matricula = req.matricula() == null ? "" : req.matricula().trim();
-        if (matricula.isEmpty()) {
-            throw new BusinessException("Matricula obrigatoria.");
+        String cpf;
+        try {
+            cpf = validarENormalizarCpf(req.cpf());
+        } catch (BusinessException e) {
+            throw new BusinessException("Dados nao conferem. Verifique nome e CPF com a escola.");
         }
 
-        Aluno aluno = alunoRepository.findByMatricula(matricula).orElse(null);
+        Aluno aluno = alunoRepository.findByCpf(cpf).orElse(null);
         if (aluno == null) {
-            // Mensagem neutra — nao confirma/nega existencia da matricula.
-            throw new BusinessException("Dados nao conferem. Verifique nome e matricula com a escola.");
+            throw new BusinessException("Dados nao conferem. Verifique nome e CPF com a escola.");
         }
 
-        // Validacao de nome — defesa contra sequestro: atacante que so saiba a
-        // matricula precisa tambem saber o nome completo cadastrado.
         if (!nomesIguais(req.nome(), aluno.getNome())) {
-            throw new BusinessException("Dados nao conferem. Verifique nome e matricula com a escola.");
+            throw new BusinessException("Dados nao conferem. Verifique nome e CPF com a escola.");
         }
 
         if (usuarioRepository.existsByAlunoId(aluno.getId())) {
-            // Aqui podemos ser explicitos — o aluno legitimo precisa saber pra logar.
             throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
         }
 
-        String email = "aluno." + matricula.toLowerCase() + "@liber.local";
+        String email = "aluno." + cpf + "@liber.local";
         Usuario usuario = Usuario.builder()
             .email(email)
-            .nome(aluno.getNome())              // usa o nome CADASTRADO (case original), nao o do request
+            .nome(aluno.getNome())
             .senhaHash(passwordEncoder.encode(req.senha()))
             .role(Role.ALUNO)
             .ativo(true)
             .passwordChangedAt(Instant.now())
-            .deveTrocarSenha(false)              // ja definiu senha no auto-cadastro
+            .deveTrocarSenha(false)
             .aluno(aluno)
             .build();
 
@@ -163,17 +156,12 @@ public class AlunoService {
         try {
             salvo = usuarioRepository.save(usuario);
         } catch (DataIntegrityViolationException e) {
-            // Race: outro request auto-cadastrando o mesmo aluno no mesmo segundo.
             throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
         }
-        log.info("Auto-cadastro de aluno matricula={} email={}", aluno.getMatricula(), salvo.getEmail());
+        log.info("Auto-cadastro de aluno cpf={} email={}", Cpf.mask(aluno.getCpf()), salvo.getEmail());
         return UsuarioResponse.from(salvo);
     }
 
-    /**
-     * Normaliza e compara dois nomes: trim, multiplas espacos -> 1, lowercase,
-     * remove acentos. Permite que "Joao da Silva" == " JOÃO  DA SILVA " == "joão da silva".
-     */
     private static boolean nomesIguais(String a, String b) {
         return normalizarNome(a).equals(normalizarNome(b));
     }
@@ -185,10 +173,32 @@ public class AlunoService {
         return norm.toLowerCase().replaceAll("\\s+", " ");
     }
 
+    /** Valida CPF (digito verificador) e retorna a versao normalizada (so digitos). */
+    private static String validarENormalizarCpf(String cpf) {
+        String norm = Cpf.normalize(cpf);
+        if (norm == null || !Cpf.isValid(norm)) {
+            throw new BusinessException("CPF invalido.");
+        }
+        return norm;
+    }
+
     /**
-     * Cria o acesso de login de um aluno (portal do aluno). Gera um Usuario com
-     * role ALUNO vinculado ao registro Aluno, com senha provisoria — o aluno e
-     * obrigado a troca-la no primeiro acesso.
+     * Termo de busca: se for CPF formatado (com pontos/hifen), normaliza pra
+     * digitos puros — o banco grava so digitos, entao "123.456.789-01" no input
+     * precisa virar "12345678901" pra match LIKE funcionar.
+     */
+    private static String normalizarTermoBusca(String termo) {
+        if (termo == null || termo.isBlank()) return termo;
+        // Se contem ponto ou hifen e o resto sao digitos, e provavel um CPF formatado
+        if (termo.matches("^[0-9.\\-]+$")) {
+            return termo.replaceAll("\\D", "");
+        }
+        return termo;
+    }
+
+    /**
+     * Cria o acesso de login de um aluno (portal do aluno). Senha provisoria,
+     * obrigatoria troca no primeiro acesso.
      */
     @Transactional
     public UsuarioResponse criarAcesso(Long alunoId, String senhaInicial) {
@@ -197,9 +207,7 @@ public class AlunoService {
             throw new BusinessException("Este aluno ja possui acesso ao sistema.");
         }
 
-        // Email sintetico — o aluno loga por matricula; este valor satisfaz a
-        // unicidade/formato do campo e nao e usado para login.
-        String email = "aluno." + aluno.getMatricula().trim().toLowerCase() + "@liber.local";
+        String email = "aluno." + aluno.getCpf() + "@liber.local";
 
         Usuario usuario = Usuario.builder()
             .email(email)
@@ -216,13 +224,11 @@ public class AlunoService {
         try {
             salvo = usuarioRepository.save(usuario);
         } catch (DataIntegrityViolationException e) {
-            // Race com outro bibliotecario criando acesso para o mesmo aluno
-            // (unique constraint em usuarios.aluno_id ou usuarios.email pega).
-            // Sem este catch, vira 409 "Conflito de dados" generico.
             throw new BusinessException(
                 "Este aluno ja possui acesso (criado por outro usuario simultaneamente).");
         }
-        log.info("Acesso de aluno criado para matricula={} email={}", aluno.getMatricula(), salvo.getEmail());
+        log.info("Acesso de aluno criado para cpf={} email={}",
+            Cpf.mask(aluno.getCpf()), salvo.getEmail());
         return UsuarioResponse.from(salvo);
     }
 

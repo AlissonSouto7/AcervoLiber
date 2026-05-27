@@ -14,16 +14,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AlunoRepository extends JpaRepository<Aluno, Long> {
 
-    Optional<Aluno> findByMatricula(String matricula);
+    Optional<Aluno> findByCpf(String cpf);
 
-    boolean existsByMatricula(String matricula);
+    boolean existsByCpf(String cpf);
 
     @Query("""
         SELECT a FROM Aluno a
         WHERE (:termo IS NULL OR :termo = ''
-               OR LOWER(a.nome)      LIKE LOWER(CONCAT('%', :termo, '%'))
-               OR LOWER(a.matricula) LIKE LOWER(CONCAT('%', :termo, '%'))
-               OR LOWER(a.turma)     LIKE LOWER(CONCAT('%', :termo, '%')))
+               OR LOWER(a.nome)  LIKE LOWER(CONCAT('%', :termo, '%'))
+               OR a.cpf          LIKE CONCAT('%', :termo, '%')
+               OR LOWER(a.turma) LIKE LOWER(CONCAT('%', :termo, '%')))
         """)
     Page<Aluno> buscar(@Param("termo") String termo, Pageable pageable);
 
