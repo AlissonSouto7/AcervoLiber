@@ -1,134 +1,97 @@
-import { useState } from 'react';
-
 /**
- * Easter egg no canto do login: croissant frances que vira a gatinha Numidia
- * ao passar o mouse (desktop) ou tocar (mobile). Homenagem fofa, totalmente
- * decorativa, nao afeta a usabilidade da tela de login.
+ * Avatar da Numidia no topo do login — homenagem fofa, totalmente decorativa.
+ * Desenhada em SVG inline (sem dependencia externa, sempre carrega).
  */
 export function PastryEasterEgg() {
-  const [revelado, setRevelado] = useState(false);
-
   return (
     <div
       role="img"
-      aria-label={revelado ? 'Numidia, a gatinha' : 'Croissant francês'}
-      onMouseEnter={() => setRevelado(true)}
-      onMouseLeave={() => setRevelado(false)}
-      onClick={() => setRevelado((v) => !v)}
+      aria-label="Numidia, a gatinha"
+      title="Numidia 🐱"
       style={{
-        width: 64,
-        height: 64,
-        cursor: 'pointer',
-        userSelect: 'none',
-        transition: 'transform 0.3s ease',
-        transform: revelado ? 'scale(1.1)' : 'scale(1)',
+        width: 72,
+        height: 72,
         margin: '0 auto 12px',
+        userSelect: 'none',
       }}
     >
-      {revelado ? <Numidia /> : <Croissant />}
+      <Numidia />
     </div>
   );
 }
 
-/** Croissant frances classico — curvado, dourado, com sombreado em camadas. */
-function Croissant() {
-  return (
-    <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="croissantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#f5d07a" />
-          <stop offset="50%" stopColor="#d49a3a" />
-          <stop offset="100%" stopColor="#a8722a" />
-        </linearGradient>
-      </defs>
-      {/* Corpo principal: curva tipo lua crescente */}
-      <path
-        d="M 8 36 Q 8 14, 32 12 Q 56 14, 56 36 Q 50 30, 32 30 Q 14 30, 8 36 Z"
-        fill="url(#croissantGrad)"
-        stroke="#8a5a1f"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      {/* Vincos/camadas da massa folhada */}
-      <path d="M 16 22 Q 18 28, 16 33" stroke="#8a5a1f" strokeWidth="1" fill="none" opacity="0.6" />
-      <path d="M 24 17 Q 25 26, 23 32" stroke="#8a5a1f" strokeWidth="1" fill="none" opacity="0.6" />
-      <path d="M 32 14 Q 32 24, 32 31" stroke="#8a5a1f" strokeWidth="1" fill="none" opacity="0.6" />
-      <path d="M 40 17 Q 39 26, 41 32" stroke="#8a5a1f" strokeWidth="1" fill="none" opacity="0.6" />
-      <path d="M 48 22 Q 46 28, 48 33" stroke="#8a5a1f" strokeWidth="1" fill="none" opacity="0.6" />
-      {/* Brilho superior */}
-      <path
-        d="M 20 18 Q 32 14, 44 18"
-        stroke="#fff3d4"
-        strokeWidth="1.5"
-        fill="none"
-        opacity="0.5"
-      />
-    </svg>
-  );
-}
-
-/** Numidia — gatinha branca com coroa, refinada a partir de referencia visual. */
+/** Numidia — gatinha branca com coroa, refinada com base na referencia. */
 function Numidia() {
   return (
-    <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 64 64" width="72" height="72" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="bgNumidia" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#4a4a55" />
+        <radialGradient id="bgNumidia" cx="35%" cy="30%" r="80%">
+          <stop offset="0%" stopColor="#5a5a68" />
           <stop offset="100%" stopColor="#2a2a32" />
         </radialGradient>
-        <linearGradient id="coroa" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#ffe27a" />
-          <stop offset="100%" stopColor="#d49a1a" />
-        </linearGradient>
       </defs>
 
-      {/* Avatar circulo de fundo */}
+      {/* Avatar circulo escuro de fundo */}
       <circle cx="32" cy="32" r="30" fill="url(#bgNumidia)" />
 
-      {/* Coroa pequena e elegante entre as orelhas */}
+      {/* Corpinho/sombra no fundo do circulo (a gatinha esta sentada) */}
+      <ellipse cx="32" cy="58" rx="14" ry="6" fill="#ffffff" opacity="0.7" />
+
+      {/* Orelhas brancas arredondadas, baixinhas, com interior rosa clarinho */}
+      <path d="M 18 22 Q 17 14, 22 13 Q 26 16, 26 22 Z" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
+      <path d="M 20 20 Q 20 17, 23 17 Q 24 19, 24 21 Z" fill="#fad5dd" />
+      <path d="M 46 22 Q 47 14, 42 13 Q 38 16, 38 22 Z" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
+      <path d="M 44 20 Q 44 17, 41 17 Q 40 19, 40 21 Z" fill="#fad5dd" />
+
+      {/* Coroa pequena dourada de 3 pontas finas */}
       <path
-        d="M 27 13 L 29 17 L 32 12 L 35 17 L 37 13 L 36.5 19 L 27.5 19 Z"
-        fill="url(#coroa)"
-        stroke="#a87410"
-        strokeWidth="0.5"
+        d="M 27 12 L 28.5 16 L 32 11 L 35.5 16 L 37 12 L 36 17 L 28 17 Z"
+        fill="#ffd24a"
+        stroke="#c0941a"
+        strokeWidth="0.4"
         strokeLinejoin="round"
       />
-      <circle cx="32" cy="13.5" r="0.9" fill="#ff6b8a" />
+      <circle cx="32" cy="12.5" r="0.7" fill="#ff7b9d" />
 
-      {/* Orelhas altas brancas com interior rosado */}
-      <path d="M 17 22 L 21 13 L 27 21 Z" fill="#ffffff" stroke="#c8c8d0" strokeWidth="0.5" strokeLinejoin="round" />
-      <path d="M 20 19 L 22 17 L 24 20 Z" fill="#fac5d5" />
-      <path d="M 47 22 L 43 13 L 37 21 Z" fill="#ffffff" stroke="#c8c8d0" strokeWidth="0.5" strokeLinejoin="round" />
-      <path d="M 44 19 L 42 17 L 40 20 Z" fill="#fac5d5" />
+      {/* Cabeça branca redonda */}
+      <ellipse cx="32" cy="33" rx="16" ry="14.5" fill="#ffffff" stroke="#dadae2" strokeWidth="0.4" />
 
-      {/* Cabeça branca redondinha */}
-      <ellipse cx="32" cy="33" rx="17" ry="15" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
+      {/* Bochechas rosadas pequenas e discretas */}
+      <ellipse cx="22.5" cy="37" rx="2.5" ry="1.4" fill="#fdc3d0" opacity="0.85" />
+      <ellipse cx="41.5" cy="37" rx="2.5" ry="1.4" fill="#fdc3d0" opacity="0.85" />
 
-      {/* Bochechas rosadas discretas */}
-      <ellipse cx="22" cy="37" rx="3" ry="1.8" fill="#fdb8c8" opacity="0.7" />
-      <ellipse cx="42" cy="37" rx="3" ry="1.8" fill="#fdb8c8" opacity="0.7" />
+      {/* Olhos grandes redondos pretos com brilho */}
+      <ellipse cx="26" cy="33" rx="2.6" ry="3" fill="#1a1a22" />
+      <ellipse cx="38" cy="33" rx="2.6" ry="3" fill="#1a1a22" />
+      {/* Brilho grande no topo de cada olho */}
+      <ellipse cx="26.8" cy="31.6" rx="1" ry="1.3" fill="#ffffff" />
+      <ellipse cx="38.8" cy="31.6" rx="1" ry="1.3" fill="#ffffff" />
+      {/* Brilho secundario pequeno */}
+      <circle cx="25.2" cy="34.3" r="0.4" fill="#ffffff" opacity="0.7" />
+      <circle cx="37.2" cy="34.3" r="0.4" fill="#ffffff" opacity="0.7" />
 
-      {/* Olhos amendoados (mais delicados que circulos grandes) */}
-      <ellipse cx="26" cy="33" rx="2.2" ry="3.2" fill="#1a1a22" />
-      <ellipse cx="38" cy="33" rx="2.2" ry="3.2" fill="#1a1a22" />
-      {/* Brilhos primarios (grandes) */}
-      <ellipse cx="26.8" cy="31.5" rx="0.9" ry="1.2" fill="#ffffff" />
-      <ellipse cx="38.8" cy="31.5" rx="0.9" ry="1.2" fill="#ffffff" />
-      {/* Brilhos secundarios (pequenos) */}
-      <circle cx="25" cy="34.5" r="0.4" fill="#ffffff" opacity="0.6" />
-      <circle cx="37" cy="34.5" r="0.4" fill="#ffffff" opacity="0.6" />
+      {/* Nariz triangulo rosa minusculo */}
+      <path d="M 31.2 39 L 32.8 39 L 32 40.3 Z" fill="#ff8aa3" />
 
-      {/* Nariz triangulo rosa, bem pequeno */}
-      <path d="M 31 39 L 33 39 L 32 40.5 Z" fill="#ff8aa3" />
+      {/* Boca sorridente (dois arquinhos pequenos formando um U invertido) */}
+      <path
+        d="M 32 40.5 Q 30 42.5, 28.5 41.8"
+        stroke="#1a1a22"
+        strokeWidth="0.85"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 32 40.5 Q 34 42.5, 35.5 41.8"
+        stroke="#1a1a22"
+        strokeWidth="0.85"
+        fill="none"
+        strokeLinecap="round"
+      />
 
-      {/* Boca em "V" delicado (sorriso fechado) */}
-      <path d="M 30 41 L 32 42.5 L 34 41" stroke="#1a1a22" strokeWidth="0.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Patinhas curtas em frente do corpinho */}
-      <ellipse cx="26" cy="52" rx="3.5" ry="2.5" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
-      <ellipse cx="38" cy="52" rx="3.5" ry="2.5" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
-      {/* Sombra entre as patinhas pra dar profundidade */}
-      <ellipse cx="32" cy="54" rx="3" ry="0.8" fill="#000" opacity="0.15" />
+      {/* Patinhas curtas e brancas em frente do corpinho */}
+      <ellipse cx="27" cy="55" rx="3.2" ry="2.5" fill="#ffffff" stroke="#dadae2" strokeWidth="0.4" />
+      <ellipse cx="37" cy="55" rx="3.2" ry="2.5" fill="#ffffff" stroke="#dadae2" strokeWidth="0.4" />
     </svg>
   );
 }
