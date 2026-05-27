@@ -124,7 +124,7 @@ export default function ReservasPendentesPage() {
           {r.aluno.nome}
           <br />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {r.aluno.matricula} · {r.aluno.turma}
+            {r.aluno.cpf} · {r.aluno.turma}
           </Typography.Text>
         </>
       ),
@@ -159,7 +159,7 @@ export default function ReservasPendentesPage() {
               <Typography.Text>{reserva.aluno.nome}</Typography.Text>
               <br />
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {reserva.aluno.matricula} · {reserva.aluno.turma}
+                {reserva.aluno.cpf} · {reserva.aluno.turma}
               </Typography.Text>
             </div>
             <div style={{ marginTop: 4 }}>
@@ -204,7 +204,7 @@ export default function ReservasPendentesPage() {
               <Tag color="blue">{confirmando.livro.titulo}</Tag>
             </Typography.Paragraph>
             <Typography.Paragraph type="secondary">
-              Aluno: {confirmando.aluno.nome} ({confirmando.aluno.matricula})
+              Aluno: {confirmando.aluno.nome} ({confirmando.aluno.cpf})
             </Typography.Paragraph>
             <Typography.Text>Prazo de empréstimo (dias):</Typography.Text>
             <div style={{ marginTop: 8 }}>

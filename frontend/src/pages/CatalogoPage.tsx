@@ -136,7 +136,7 @@ export default function CatalogoPage() {
                 {livro.autor}
                 {livro.ano ? ` · ${livro.ano}` : ''}
               </Typography.Paragraph>
-              {livro.quantidadeDisponivel > 0 ? (
+              {livro.exemplaresDisponiveis > 0 ? (
                 <Button
                   type="primary"
                   block
@@ -173,7 +173,7 @@ export default function CatalogoPage() {
         width={720}
         footer={
           detalhe ? (
-            detalhe.quantidadeDisponivel > 0 ? (
+            detalhe.exemplaresDisponiveis > 0 ? (
               <Button
                 type="primary"
                 disabled={semVagas}
@@ -204,7 +204,7 @@ export default function CatalogoPage() {
                 {detalhe.ano && <Descriptions.Item label="Ano">{detalhe.ano}</Descriptions.Item>}
                 {detalhe.isbn && <Descriptions.Item label="ISBN">{detalhe.isbn}</Descriptions.Item>}
                 <Descriptions.Item label="Disponíveis">
-                  {detalhe.quantidadeDisponivel} de {detalhe.quantidadeExemplares}
+                  {detalhe.exemplaresDisponiveis} de {detalhe.exemplaresTotal}
                 </Descriptions.Item>
               </Descriptions>
               <Typography.Title level={5} style={{ marginTop: 16, marginBottom: 8 }}>

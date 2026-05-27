@@ -9,6 +9,15 @@ import type { LoginResponse } from '../types/api';
 
 type ModoAluno = 'login' | 'cadastro';
 
+/** Aplica mascara CPF (999.999.999-99) no valor digitado. */
+function mascararCpf(valor: string): string {
+  const digitos = valor.replace(/\D/g, '').slice(0, 11);
+  if (digitos.length <= 3) return digitos;
+  if (digitos.length <= 6) return `${digitos.slice(0, 3)}.${digitos.slice(3)}`;
+  if (digitos.length <= 9) return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6)}`;
+  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const setSessao = useAuthStore((s) => s.setSessao);
@@ -30,7 +39,7 @@ export default function LoginPage() {
   }
 
   async function cadastrarAluno(v: {
-    matricula: string;
+    cpf: string;
     nome: string;
     senha: string;
     confirmacao: string;
@@ -41,10 +50,9 @@ export default function LoginPage() {
     }
     setCarregando(true);
     try {
-      await registerAluno(v.matricula.trim(), v.nome.trim(), v.senha);
+      await registerAluno(v.cpf.trim(), v.nome.trim(), v.senha);
       message.success('Cadastro feito! Fazendo login...');
-      // Auto-login com a senha que o aluno acabou de definir.
-      await entrar(loginAluno(v.matricula.trim(), v.senha));
+      await entrar(loginAluno(v.cpf.trim(), v.senha));
     } catch (erro) {
       message.error(mensagemDeErro(erro, 'Não foi possível cadastrar'));
       setCarregando(false);
@@ -56,15 +64,19 @@ export default function LoginPage() {
       layout="vertical"
       size="large"
       disabled={carregando}
-      onFinish={(v: { matricula: string; senha: string }) =>
-        entrar(loginAluno(v.matricula.trim(), v.senha))}
+      onFinish={(v: { cpf: string; senha: string }) =>
+        entrar(loginAluno(v.cpf.trim(), v.senha))}
     >
       <Form.Item
-        name="matricula"
-        label="Matrícula"
-        rules={[{ required: true, message: 'Informe sua matrícula' }]}
+        name="cpf"
+        label="CPF"
+        normalize={mascararCpf}
+        rules={[
+          { required: true, message: 'Informe seu CPF' },
+          { min: 14, message: 'CPF incompleto' },
+        ]}
       >
-        <Input prefix={<IdcardOutlined />} placeholder="Sua matrícula" autoComplete="username" />
+        <Input prefix={<IdcardOutlined />} placeholder="000.000.000-00" autoComplete="username" inputMode="numeric" />
       </Form.Item>
       <Form.Item name="senha" label="Senha" rules={[{ required: true, message: 'Informe a senha' }]}>
         <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
@@ -87,15 +99,19 @@ export default function LoginPage() {
   const formAlunoCadastro = (
     <Form layout="vertical" size="large" disabled={carregando} onFinish={cadastrarAluno}>
       <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
-        Use a <strong>matrícula</strong> e o <strong>nome completo</strong> conforme cadastrados pela
+        Use seu <strong>CPF</strong> e o <strong>nome completo</strong> conforme cadastrados pela
         escola. Se os dados não conferirem, procure o(a) bibliotecário(a).
       </Typography.Paragraph>
       <Form.Item
-        name="matricula"
-        label="Matrícula"
-        rules={[{ required: true, message: 'Informe sua matrícula' }]}
+        name="cpf"
+        label="CPF"
+        normalize={mascararCpf}
+        rules={[
+          { required: true, message: 'Informe seu CPF' },
+          { min: 14, message: 'CPF incompleto' },
+        ]}
       >
-        <Input prefix={<IdcardOutlined />} placeholder="Ex: 2026001" autoComplete="off" />
+        <Input prefix={<IdcardOutlined />} placeholder="000.000.000-00" autoComplete="off" inputMode="numeric" />
       </Form.Item>
       <Form.Item
         name="nome"
@@ -112,9 +128,9 @@ export default function LoginPage() {
         label="Senha"
         rules={[
           { required: true, message: 'Informe uma senha' },
-          { min: 8, message: 'Mínimo 8 caracteres' },
+          { min: 10, message: 'Mínimo 10 caracteres' },
         ]}
-        extra="Mín. 8 caracteres com letras e números."
+        tooltip="Mínimo 10 caracteres."
       >
         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
       </Form.Item>

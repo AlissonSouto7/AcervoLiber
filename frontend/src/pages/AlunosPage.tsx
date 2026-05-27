@@ -87,7 +87,7 @@ export default function AlunosPage() {
   }
 
   const valoresIniciais: Partial<AlunoPayload> = editando
-    ? { matricula: editando.matricula, nome: editando.nome, turma: editando.turma }
+    ? { cpf: editando.cpf, nome: editando.nome, turma: editando.turma }
     : {};
 
   const acoes = (aluno: AlunoResponse) => (
@@ -107,7 +107,7 @@ export default function AlunosPage() {
   );
 
   const colunas: TableProps<AlunoResponse>['columns'] = [
-    { title: 'Matrícula', dataIndex: 'matricula', width: 120 },
+    { title: 'CPF', dataIndex: 'cpf', width: 160 },
     { title: 'Nome', dataIndex: 'nome' },
     { title: 'Turma', dataIndex: 'turma', width: 90 },
     { title: 'Empréstimos', key: 'emp', width: 200, render: (_, a) => tagEmprestimos(a) },
@@ -138,7 +138,7 @@ export default function AlunosPage() {
         </Typography.Title>
         <Space wrap style={{ flex: isMobile ? '1 1 100%' : undefined }}>
           <Input.Search
-            placeholder="Buscar por nome, matrícula ou turma"
+            placeholder="Buscar por nome, CPF ou turma"
             allowClear
             onSearch={(v) => {
               setTermo(v);
@@ -180,7 +180,7 @@ export default function AlunosPage() {
                   <Typography.Text strong>{aluno.nome}</Typography.Text>
                   <div>
                     <Typography.Text type="secondary">
-                      {aluno.matricula} · Turma {aluno.turma}
+                      {aluno.cpf} · Turma {aluno.turma}
                     </Typography.Text>
                   </div>
                   <div style={{ marginTop: 8 }}>{tagEmprestimos(aluno)}</div>
@@ -215,11 +215,15 @@ export default function AlunosPage() {
             onFinish={(valores) => salvar.mutate(valores)}
           >
             <Form.Item
-              name="matricula"
-              label="Matrícula"
-              rules={[{ required: true, message: 'Informe a matrícula' }]}
+              name="cpf"
+              label="CPF"
+              rules={[
+                { required: true, message: 'Informe o CPF' },
+                { min: 11, message: 'CPF incompleto' },
+              ]}
+              tooltip="Aceita com ou sem mascara (123.456.789-01 ou 12345678901)"
             >
-              <Input />
+              <Input placeholder="000.000.000-00" inputMode="numeric" />
             </Form.Item>
             <Form.Item
               name="nome"

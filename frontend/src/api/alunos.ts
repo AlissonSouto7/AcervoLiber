@@ -3,7 +3,8 @@ import type { AlunoResponse, Page } from '../types/api';
 
 /** Dados enviados ao criar/editar um aluno. */
 export interface AlunoPayload {
-  matricula: string;
+  /** CPF do aluno (com ou sem mascara — backend normaliza). */
+  cpf: string;
   nome: string;
   turma: string;
 }

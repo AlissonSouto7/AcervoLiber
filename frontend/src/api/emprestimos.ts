@@ -3,7 +3,8 @@ import type { EmprestimoResponse, Page } from '../types/api';
 
 /** Dados enviados ao registrar um emprestimo. */
 export interface EmprestimoPayload {
-  livroId: number;
+  /** ID do exemplar fisico (copia especifica) — escolhido pelo bibliotecario. */
+  exemplarId: number;
   alunoId: number;
   prazoDias: number;
 }

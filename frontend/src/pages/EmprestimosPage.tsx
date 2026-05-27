@@ -18,6 +18,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listarAlunos } from '../api/alunos';
 import { listarLivros } from '../api/livros';
+import { listarExemplares } from '../api/exemplares';
 import {
   devolverEmprestimo,
   listarEmprestimosAtivos,
@@ -42,6 +43,8 @@ export default function EmprestimosPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [drawerAberto, setDrawerAberto] = useState(false);
+  // Livro selecionado no form (controla carregamento de exemplares)
+  const [livroSelecionadoId, setLivroSelecionadoId] = useState<number | null>(null);
 
   const { data: ativos, isLoading } = useQuery({
     queryKey: ['emprestimos-ativos'],
@@ -85,11 +88,22 @@ export default function EmprestimosPage() {
     onError: (erro) => message.error(mensagemDeErro(erro)),
   });
 
+  // Exemplares do livro escolhido — so DISPONIVEL pode ser emprestado
+  const { data: exemplares } = useQuery({
+    queryKey: ['exemplares-do-livro', livroSelecionadoId],
+    queryFn: () => listarExemplares(livroSelecionadoId!),
+    enabled: drawerAberto && livroSelecionadoId !== null,
+  });
+
   const livroOpcoes = (livros?.content ?? []).map((l) => ({
     value: l.id,
-    label: `${l.titulo} — ${l.quantidadeDisponivel} disp.`,
-    disabled: l.quantidadeDisponivel === 0,
+    label: `${l.titulo} — ${l.exemplaresDisponiveis} disp.`,
+    disabled: l.exemplaresDisponiveis === 0,
   }));
+
+  const exemplarOpcoes = (exemplares ?? [])
+    .filter((e) => e.situacao === 'DISPONIVEL')
+    .map((e) => ({ value: e.id, label: e.codigo }));
 
   const alunoOpcoes = (alunos?.content ?? []).map((a) => ({
     value: a.id,
@@ -193,14 +207,23 @@ export default function EmprestimosPage() {
       <Drawer
         title="Novo empréstimo"
         open={drawerAberto}
-        onClose={() => setDrawerAberto(false)}
+        onClose={() => {
+          setDrawerAberto(false);
+          setLivroSelecionadoId(null);
+        }}
         width={isMobile ? '100%' : 420}
       >
         {drawerAberto && (
-          <Form<EmprestimoPayload>
+          <Form<EmprestimoPayload & { livroId?: number }>
             layout="vertical"
             initialValues={{ prazoDias: 7 }}
-            onFinish={(valores) => registrar.mutate(valores)}
+            onFinish={(valores) =>
+              registrar.mutate({
+                exemplarId: valores.exemplarId,
+                alunoId: valores.alunoId,
+                prazoDias: valores.prazoDias,
+              })
+            }
           >
             <Form.Item
               name="livroId"
@@ -213,6 +236,24 @@ export default function EmprestimosPage() {
                 optionFilterProp="label"
                 options={livroOpcoes}
                 loading={!livros}
+                onChange={(id) => setLivroSelecionadoId(id ?? null)}
+              />
+            </Form.Item>
+            <Form.Item
+              name="exemplarId"
+              label="Exemplar (código de tombamento)"
+              rules={[{ required: true, message: 'Escolha o exemplar' }]}
+              tooltip="Cada cópia tem um código próprio. O bibliotecário escolhe qual copia exata está sendo emprestada."
+            >
+              <Select
+                placeholder={livroSelecionadoId ? 'Escolha um exemplar disponível' : 'Selecione o livro primeiro'}
+                options={exemplarOpcoes}
+                disabled={!livroSelecionadoId}
+                notFoundContent={
+                  livroSelecionadoId
+                    ? (exemplares ? 'Nenhum exemplar disponível' : 'Carregando...')
+                    : 'Selecione o livro primeiro'
+                }
               />
             </Form.Item>
             <Form.Item

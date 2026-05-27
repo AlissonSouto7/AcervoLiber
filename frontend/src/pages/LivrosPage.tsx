@@ -41,9 +41,9 @@ const TAMANHO_MAX_CAPA = 2 * 1024 * 1024;
 
 /** Selo de disponibilidade do livro. */
 function tagDisponibilidade(livro: LivroResponse) {
-  const disp = livro.quantidadeDisponivel;
+  const disp = livro.exemplaresDisponiveis;
   if (disp > 0) {
-    return <Tag color="green">{disp} de {livro.quantidadeExemplares} disponíveis</Tag>;
+    return <Tag color="green">{disp} de {livro.exemplaresTotal} disponíveis</Tag>;
   }
   return <Tag color="red">Indisponível no momento</Tag>;
 }
@@ -162,10 +162,11 @@ export default function LivrosPage() {
         autor: editando.autor,
         isbn: editando.isbn ?? undefined,
         ano: editando.ano ?? undefined,
-        quantidadeExemplares: editando.quantidadeExemplares,
+        // exemplaresIniciais nao se aplica no edit — gestao de exemplares
+        // acontece em endpoint separado (/livros/{id}/exemplares).
         sinopse: editando.sinopse ?? undefined,
       }
-    : { quantidadeExemplares: 1 };
+    : { exemplaresIniciais: 1 };
 
   return (
     <>
@@ -387,13 +388,16 @@ export default function LivrosPage() {
             <Form.Item name="ano" label="Ano de publicação">
               <InputNumber style={{ width: '100%' }} min={1000} max={9999} placeholder="Opcional" />
             </Form.Item>
-            <Form.Item
-              name="quantidadeExemplares"
-              label="Quantidade de exemplares"
-              rules={[{ required: true, message: 'Informe a quantidade' }]}
-            >
-              <InputNumber style={{ width: '100%' }} min={1} />
-            </Form.Item>
+            {!editando && (
+              <Form.Item
+                name="exemplaresIniciais"
+                label="Quantidade de exemplares iniciais"
+                rules={[{ required: true, message: 'Informe a quantidade' }]}
+                tooltip="Cada copia fisica ganha um codigo de tombamento proprio (LIB-XXXXX). Voce pode renomear depois pra casar com a etiqueta da escola."
+              >
+                <InputNumber style={{ width: '100%' }} min={1} max={100} />
+              </Form.Item>
+            )}
             <Form.Item
               name="sinopse"
               label="Sinopse (opcional)"

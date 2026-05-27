@@ -6,18 +6,18 @@ export async function login(email: string, senha: string): Promise<LoginResponse
   return resp.data;
 }
 
-/** Login do aluno — por matricula. */
-export async function loginAluno(matricula: string, senha: string): Promise<LoginResponse> {
-  const resp = await http.post<LoginResponse>('/auth/login-aluno', { matricula, senha });
+/** Login do aluno — por CPF (V18 substituiu matricula). */
+export async function loginAluno(cpf: string, senha: string): Promise<LoginResponse> {
+  const resp = await http.post<LoginResponse>('/auth/login-aluno', { cpf, senha });
   return resp.data;
 }
 
 /**
- * Auto-cadastro de aluno (tela publica). Backend valida que a matricula foi
- * pre-cadastrada pela escola e que o nome bate (defesa anti-sequestro).
+ * Auto-cadastro de aluno (tela publica). Backend valida que o CPF foi
+ * pre-cadastrado pela escola e que o nome bate (defesa anti-sequestro).
  */
-export async function registerAluno(matricula: string, nome: string, senha: string): Promise<Usuario> {
-  const resp = await http.post<Usuario>('/auth/register-aluno', { matricula, nome, senha });
+export async function registerAluno(cpf: string, nome: string, senha: string): Promise<Usuario> {
+  const resp = await http.post<Usuario>('/auth/register-aluno', { cpf, nome, senha });
   return resp.data;
 }
 

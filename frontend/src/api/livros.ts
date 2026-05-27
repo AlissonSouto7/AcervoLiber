@@ -7,7 +7,11 @@ export interface LivroPayload {
   autor: string;
   isbn?: string | null;
   ano?: number | null;
-  quantidadeExemplares: number;
+  /**
+   * Quantos exemplares cadastrar de cara — so usado no POST. No PUT este
+   * campo e ignorado (gestao de exemplares vai por /livros/{id}/exemplares).
+   */
+  exemplaresIniciais?: number;
   sinopse?: string | null;
 }
 

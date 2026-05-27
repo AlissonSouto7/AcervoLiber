@@ -11,6 +11,8 @@ export type StatusUrgencia = 'VERDE' | 'AMARELO' | 'VERMELHO' | 'DEVOLVIDO';
 
 export type StatusReserva = 'PENDENTE' | 'CONFIRMADA' | 'RECUSADA' | 'CANCELADA' | 'EXPIRADA';
 
+export type SituacaoExemplar = 'DISPONIVEL' | 'EMPRESTADO' | 'RESERVADO' | 'EXTRAVIADO';
+
 export interface Usuario {
   id: number;
   email: string;
@@ -34,8 +36,10 @@ export interface LivroResponse {
   autor: string;
   isbn: string | null;
   ano: number | null;
-  quantidadeExemplares: number;
-  quantidadeDisponivel: number;
+  /** Total de exemplares fisicos cadastrados (em qualquer situacao). */
+  exemplaresTotal: number;
+  /** Quantos exemplares estao DISPONIVEL pra emprestimo/reserva imediato. */
+  exemplaresDisponiveis: number;
   /** URL da capa (externa automatica ou imagem enviada); null se nao houver. */
   capaUrl: string | null;
   /** true quando a capa foi enviada manualmente (nao e sobrescrita pela busca). */
@@ -46,9 +50,18 @@ export interface LivroResponse {
   updatedAt: string;
 }
 
+export interface ExemplarResponse {
+  id: number;
+  codigo: string;
+  situacao: SituacaoExemplar;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AlunoResponse {
   id: number;
-  matricula: string;
+  /** CPF formatado (123.456.789-01) ou mascarado (123.***.***-01) — depende do contexto. */
+  cpf: string;
   nome: string;
   turma: string;
   livrosEmprestadosAtualmente: number;
@@ -60,11 +73,15 @@ export interface LivroResumo {
   id: number;
   titulo: string;
   autor: string;
+  /** ID do exemplar fisico envolvido. Null em contextos puramente bibliograficos (reserva por titulo). */
+  exemplarId: number | null;
+  /** Codigo de tombamento do exemplar (ex.: LIB-00042). Null se nao aplicavel. */
+  exemplarCodigo: string | null;
 }
 
 export interface AlunoResumo {
   id: number;
-  matricula: string;
+  cpf: string;
   nome: string;
   turma: string;
 }
@@ -91,9 +108,11 @@ export interface LivroRanking {
 export interface DashboardAlertaDTO {
   emprestimoId: number;
   livroTitulo: string;
+  /** Codigo de tombamento do exemplar emprestado. */
+  exemplarCodigo: string;
   alunoNome: string;
-  /** Matricula com os ultimos digitos mascarados (Fase 7 fix LGPD). */
-  alunoMatriculaMascarada: string;
+  /** CPF com pontos mascarados (123.***.***-01). */
+  alunoCpfMascarado: string;
   alunoTurma: string | null;
   dataEmprestimo: string;
   dataDevolucaoPrevista: string;
