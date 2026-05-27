@@ -5,18 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { login, loginAluno, registerAluno } from '../api/auth';
 import { mensagemDeErro } from '../api/http';
 import { useAuthStore } from '../auth/authStore';
+import { PastryEasterEgg } from '../components/PastryEasterEgg';
 import type { LoginResponse } from '../types/api';
+import { mascararCpf } from '../utils/cpf';
 
 type ModoAluno = 'login' | 'cadastro';
-
-/** Aplica mascara CPF (999.999.999-99) no valor digitado. */
-function mascararCpf(valor: string): string {
-  const digitos = valor.replace(/\D/g, '').slice(0, 11);
-  if (digitos.length <= 3) return digitos;
-  if (digitos.length <= 6) return `${digitos.slice(0, 3)}.${digitos.slice(3)}`;
-  if (digitos.length <= 9) return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6)}`;
-  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
-}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -193,6 +186,7 @@ export default function LoginPage() {
       }}
     >
       <Card style={{ width: '100%', maxWidth: 400 }}>
+        <PastryEasterEgg />
         <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: 8 }}>
           AcervoLiber
         </Typography.Title>

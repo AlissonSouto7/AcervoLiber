@@ -27,6 +27,7 @@ import {
 } from '../api/alunos';
 import { mensagemDeErro } from '../api/http';
 import type { AlunoResponse } from '../types/api';
+import { mascararCpf } from '../utils/cpf';
 
 const TAMANHO_PAGINA = 10;
 
@@ -217,11 +218,12 @@ export default function AlunosPage() {
             <Form.Item
               name="cpf"
               label="CPF"
+              normalize={mascararCpf}
               rules={[
                 { required: true, message: 'Informe o CPF' },
-                { min: 11, message: 'CPF incompleto' },
+                { min: 14, message: 'CPF incompleto' },
               ]}
-              tooltip="Aceita com ou sem mascara (123.456.789-01 ou 12345678901)"
+              tooltip="Mascara aplicada automaticamente conforme voce digita."
             >
               <Input placeholder="000.000.000-00" inputMode="numeric" />
             </Form.Item>
