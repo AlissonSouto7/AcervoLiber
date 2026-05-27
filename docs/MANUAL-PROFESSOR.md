@@ -60,7 +60,7 @@ Abra o navegador (Chrome, Edge, Firefox, Safari) e digite:
 
 Você verá a tela de login. Use o e-mail e a senha que receberam da direção/coordenação.
 
-Se for **aluno**, ele entra por **matrícula**, não por e-mail (mais sobre isso na seção 10).
+Se for **aluno**, ele entra por **CPF**, não por e-mail (mais sobre isso na seção 10).
 
 ### Dica importante
 
@@ -118,17 +118,28 @@ A busca é instantânea.
 
 Clique em **+ Novo livro** no topo direito. Preencha:
 
-| Campo              | Obrigatório? | Detalhes                                                                                   |
-|--------------------|:------------:|--------------------------------------------------------------------------------------------|
-| **Título**         | Sim          | Como aparece na capa do livro.                                                              |
-| **Autor**          | Sim          | Nome completo, ex: "Jorge Amado".                                                           |
-| **ISBN**           | Não          | Código de 10 ou 13 dígitos atrás do livro. Ajuda muito a achar a capa correta.             |
-| **Ano**            | Não          | Ano da publicação (1000 a 9999).                                                            |
-| **Quantidade**     | Sim          | Quantos exemplares físicos a biblioteca tem.                                                |
-| **Capa**           | Não          | O sistema tenta achar a capa automaticamente pela internet. Você pode subir uma também.    |
-| **Sinopse**        | Não          | Texto curto descrevendo o livro. Se você não escrever, o sistema tenta buscar sozinho.      |
+| Campo                       | Obrigatório? | Detalhes                                                                                   |
+|-----------------------------|:------------:|--------------------------------------------------------------------------------------------|
+| **Título**                  | Sim          | Como aparece na capa do livro.                                                              |
+| **Autor**                   | Sim          | Nome completo, ex: "Jorge Amado".                                                           |
+| **ISBN**                    | Não          | Código de 10 ou 13 dígitos atrás do livro. Ajuda muito a achar a capa correta.             |
+| **Ano**                     | Não          | Ano da publicação (1000 a 9999).                                                            |
+| **Exemplares iniciais**     | Sim          | Quantas cópias físicas você tem desse livro. O sistema cria N "exemplares" automaticamente, cada um com um código de tombamento próprio (LIB-00001, LIB-00002, etc.). |
+| **Capa**                    | Não          | O sistema tenta achar a capa automaticamente pela internet. Você pode subir uma também.    |
+| **Sinopse**                 | Não          | Texto curto descrevendo o livro. Se você não escrever, o sistema tenta buscar sozinho.      |
 
 Clique em **Salvar** e pronto.
+
+#### Exemplares — o que mudou
+
+Antes, o sistema só guardava "tenho 5 cópias de Dom Casmurro". Agora cada cópia tem **identidade própria**: você sabe que o exemplar `LIB-00042` está com o aluno Felipe, e o `LIB-00043` está na prateleira.
+
+Por que isso importa:
+- Se o aluno perder um livro, você sabe exatamente qual cópia ficou faltando do acervo.
+- Você pode marcar um exemplar específico como **extraviado** sem afetar os outros.
+- Permite alinhar com a **etiqueta de tombamento** que a escola já cola nos livros — basta renomear o código padrão (`LIB-00042`) pra etiqueta real (`2024-A-042`, ou o que a escola usa).
+
+> Os botões pra renomear, extraviar e adicionar exemplares avulsos chegarão numa atualização rápida — por enquanto, o sistema cria os exemplares no cadastro inicial com códigos sequenciais (LIB-XXXXX).
 
 ### 5.4 Sobre a capa do livro
 
@@ -159,17 +170,19 @@ Se você diminuir a **Quantidade** de exemplares de um livro, o sistema **não d
 
 ### 6.1 Acessando
 
-Menu lateral → **Alunos**. Você vê todos os alunos cadastrados, com matrícula, nome, turma e quantos livros eles têm emprestados no momento.
+Menu lateral → **Alunos**. Você vê todos os alunos cadastrados, com CPF, nome, turma e quantos livros eles têm emprestados no momento.
 
 ### 6.2 Adicionar um aluno
 
 Clique em **+ Novo aluno** e preencha:
 
-| Campo          | Detalhes                                                                              |
-|----------------|---------------------------------------------------------------------------------------|
-| **Matrícula**  | Identificador único do aluno na escola. Não pode repetir.                              |
-| **Nome**       | Nome completo do aluno (como deve aparecer no boletim).                                |
-| **Turma**      | Ex: "6A", "9B". Use o padrão que a escola já adota.                                    |
+| Campo       | Detalhes                                                                              |
+|-------------|---------------------------------------------------------------------------------------|
+| **CPF**     | CPF do aluno. Aceita com ou sem máscara (123.456.789-01 ou só dígitos). Validado.     |
+| **Nome**    | Nome completo do aluno (como deve aparecer no boletim).                                |
+| **Turma**   | Ex: "6A", "9B". Use o padrão que a escola já adota.                                    |
+
+**Por que CPF?** Cada aluno tem um CPF único, fácil de lembrar (ou os pais sabem). Substituiu o conceito de "matrícula" que a escola não tinha formalizado.
 
 ### 6.3 Criar acesso de login pro aluno
 
@@ -184,9 +197,9 @@ No primeiro login ele será obrigado a trocar pela senha pessoal dele.
 
 ### 6.4 Auto-cadastro pelos alunos
 
-A escola pode escolher um modelo **mais aberto**: você cadastra a matrícula + nome do aluno na tela de Alunos, e o próprio aluno cria sua senha sozinho pela tela inicial do sistema (link **Sou aluno — primeiro acesso**). O sistema valida:
+A escola pode escolher um modelo **mais aberto**: você cadastra o CPF + nome do aluno na tela de Alunos, e o próprio aluno cria sua senha sozinho pela tela inicial do sistema (link **Sou aluno — primeiro acesso**). O sistema valida:
 
-- A matrícula precisa existir no cadastro
+- O CPF precisa existir no cadastro (e ser CPF válido — sistema checa dígito verificador)
 - O nome digitado pelo aluno precisa bater com o nome cadastrado (ignora acentos e maiúsculas)
 - O aluno ainda não pode ter acesso criado
 
@@ -211,11 +224,12 @@ Quando o aluno chega no balcão com o livro:
 1. Menu lateral → **Empréstimos**
 2. Clique em **+ Novo empréstimo**
 3. **Livro**: comece a digitar o título ou autor; o sistema sugere
-4. **Aluno**: comece a digitar nome, matrícula ou turma
-5. **Prazo de devolução (dias)**: padrão 7, pode ajustar (1 a 30 dias)
-6. Clique em **Registrar empréstimo**
+4. **Exemplar (código de tombamento)**: depois de escolher o livro, o sistema mostra os códigos dos exemplares DISPONÍVEIS. Escolha o exemplar exato que o aluno está levando (confira a etiqueta do livro físico).
+5. **Aluno**: comece a digitar nome, CPF ou turma
+6. **Prazo de devolução (dias)**: padrão 7, pode ajustar (1 a 30 dias)
+7. Clique em **Registrar empréstimo**
 
-O estoque do livro é descontado automaticamente. O sistema calcula a data prevista de devolução.
+O exemplar muda automaticamente pra "EMPRESTADO" e o sistema calcula a data prevista de devolução. Se o aluno extraviar, você sabe exatamente qual cópia precisa cobrar.
 
 ### 7.2 Regras automáticas
 
@@ -308,7 +322,7 @@ Menu lateral → **Histórico**. Aqui você vê **todos os empréstimos passados
 
 Filtros disponíveis:
 - Por situação (Ativo, Devolvido, Cancelado)
-- Por aluno (busca por nome ou matrícula)
+- Por aluno (busca por nome ou CPF)
 - Por livro
 
 Útil pra:
@@ -324,9 +338,9 @@ Vale você conhecer o que o aluno vê, pra orientar quando tiverem dúvida.
 
 ### 10.1 Login do aluno
 
-Tela inicial → o aluno entra na aba **Aluno** e usa **matrícula + senha** (não e-mail).
+Tela inicial → o aluno entra na aba **Aluno** e usa **CPF + senha** (não e-mail).
 
-Se ele nunca usou e a escola optou pelo auto-cadastro: ele clica em **Sou aluno — primeiro acesso**, digita matrícula + nome completo (precisa bater com o cadastro) + cria a senha dele.
+Se ele nunca usou e a escola optou pelo auto-cadastro: ele clica em **Sou aluno — primeiro acesso**, digita CPF + nome completo (precisa bater com o cadastro) + cria a senha dele. O campo de CPF aplica máscara automática (`999.999.999-99`).
 
 ### 10.2 Catálogo
 
@@ -422,7 +436,7 @@ R: Correto, esse é o limite normal. Mas você (bibliotecário) **pode lançar m
 R: Não é possível recuperar pela tela. Mas o sistema não permite apagar livros/alunos com histórico, então se foi apagado é porque não tinha movimento. Cadastre de novo.
 
 **P: Como vejo todos os livros que um aluno já pegou?**
-R: Tela **Histórico**, filtre pelo nome ou matrícula do aluno.
+R: Tela **Histórico**, filtre pelo nome ou CPF do aluno.
 
 **P: O internet caiu, posso usar offline?**
 R: Não. O sistema precisa de internet — fica numa nuvem. Caso a internet caia, registre os empréstimos no papel e lance assim que voltar.
@@ -452,7 +466,7 @@ Se a mensagem for genérica ("Erro inesperado"), recarregue a página (F5) e ten
 
 ### Aluno reclama que não consegue entrar
 
-1. Confirme que a matrícula está cadastrada
+1. Confirme que o CPF está cadastrado (e foi digitado corretamente)
 2. Confirme que ele tem **acesso ao sistema** criado (tela de Alunos)
 3. Se ele esqueceu a senha, peça a um administrador para resetar
 4. Verifique se a conta dele não está **desativada** (tela de Usuários)
