@@ -66,7 +66,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 90s  # +30s vs Oracle: cold start do Neon na primeira conexao
+      # 240s: Spring Boot 4 + Neon cold start + migration grande passa de 200s
+      # em VM e2-micro (1 vCPU). Abaixo disso, compose marca app "unhealthy"
+      # antes do boot terminar e o frontend (depends_on) nao sobe.
+      start_period: 240s
     restart: unless-stopped
     mem_limit: 600m
     cpus: 0.6
