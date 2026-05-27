@@ -261,6 +261,6 @@ Projeto educacional/comunitário. Use à vontade, atribua quando possível.
 
 Sistema concebido e desenvolvido por **Alisson Pinheiro Souto** ([@AlissonSouto7](https://github.com/AlissonSouto7)) para a Escola Municipal Gabriel José Pereira (Eunápolis-BA, 2026), no âmbito do Projeto de Extensão I da Engenharia de Software.
 
-Easter egg do login dedicado à **Numidia** 🐱 (homenagem da casa).
+**Numidia** 🐱
 
 > *"Quando há vontade real, a tecnologia bem aplicada cabe no bolso de qualquer escola."*
