@@ -67,62 +67,68 @@ function Croissant() {
   );
 }
 
-/** Numidia — gatinha branca com coroa, bochechas rosadas, olhos grandes pretos. */
+/** Numidia — gatinha branca com coroa, refinada a partir de referencia visual. */
 function Numidia() {
   return (
     <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-      {/* Sombra/circulo de fundo cinza */}
-      <circle cx="32" cy="34" r="28" fill="#3a3a45" />
+      <defs>
+        <radialGradient id="bgNumidia" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#4a4a55" />
+          <stop offset="100%" stopColor="#2a2a32" />
+        </radialGradient>
+        <linearGradient id="coroa" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffe27a" />
+          <stop offset="100%" stopColor="#d49a1a" />
+        </linearGradient>
+      </defs>
 
-      {/* Orelhas brancas com interior rosa */}
-      <path d="M 17 18 L 19 28 L 26 22 Z" fill="#ffffff" stroke="#d0d0d0" strokeWidth="0.5" />
-      <path d="M 19 22 L 20 26 L 23 23 Z" fill="#f8c8d8" />
-      <path d="M 47 18 L 45 28 L 38 22 Z" fill="#ffffff" stroke="#d0d0d0" strokeWidth="0.5" />
-      <path d="M 45 22 L 44 26 L 41 23 Z" fill="#f8c8d8" />
+      {/* Avatar circulo de fundo */}
+      <circle cx="32" cy="32" r="30" fill="url(#bgNumidia)" />
 
-      {/* Coroa amarela */}
+      {/* Coroa pequena e elegante entre as orelhas */}
       <path
-        d="M 25 14 L 27 18 L 30 13 L 32 17 L 34 13 L 37 18 L 39 14 L 38 21 L 26 21 Z"
-        fill="#ffd24a"
-        stroke="#c99617"
-        strokeWidth="0.6"
+        d="M 27 13 L 29 17 L 32 12 L 35 17 L 37 13 L 36.5 19 L 27.5 19 Z"
+        fill="url(#coroa)"
+        stroke="#a87410"
+        strokeWidth="0.5"
         strokeLinejoin="round"
       />
-      <circle cx="27" cy="14" r="1" fill="#ff5575" />
-      <circle cx="32" cy="13" r="1" fill="#54b3ff" />
-      <circle cx="37" cy="14" r="1" fill="#ff5575" />
+      <circle cx="32" cy="13.5" r="0.9" fill="#ff6b8a" />
 
-      {/* Cabeça branca redonda */}
-      <ellipse cx="32" cy="34" rx="20" ry="18" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" />
+      {/* Orelhas altas brancas com interior rosado */}
+      <path d="M 17 22 L 21 13 L 27 21 Z" fill="#ffffff" stroke="#c8c8d0" strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M 20 19 L 22 17 L 24 20 Z" fill="#fac5d5" />
+      <path d="M 47 22 L 43 13 L 37 21 Z" fill="#ffffff" stroke="#c8c8d0" strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M 44 19 L 42 17 L 40 20 Z" fill="#fac5d5" />
 
-      {/* Bochechas rosadas */}
-      <ellipse cx="20" cy="38" rx="4" ry="2.5" fill="#fdb8c8" opacity="0.8" />
-      <ellipse cx="44" cy="38" rx="4" ry="2.5" fill="#fdb8c8" opacity="0.8" />
+      {/* Cabeça branca redondinha */}
+      <ellipse cx="32" cy="33" rx="17" ry="15" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
 
-      {/* Olhos grandes pretos com brilho */}
-      <ellipse cx="25" cy="33" rx="3" ry="4.5" fill="#1a1a1a" />
-      <ellipse cx="39" cy="33" rx="3" ry="4.5" fill="#1a1a1a" />
-      <ellipse cx="26" cy="31" rx="1" ry="1.5" fill="#ffffff" />
-      <ellipse cx="40" cy="31" rx="1" ry="1.5" fill="#ffffff" />
-      <ellipse cx="24" cy="35" rx="0.5" ry="0.8" fill="#ffffff" opacity="0.7" />
-      <ellipse cx="38" cy="35" rx="0.5" ry="0.8" fill="#ffffff" opacity="0.7" />
+      {/* Bochechas rosadas discretas */}
+      <ellipse cx="22" cy="37" rx="3" ry="1.8" fill="#fdb8c8" opacity="0.7" />
+      <ellipse cx="42" cy="37" rx="3" ry="1.8" fill="#fdb8c8" opacity="0.7" />
 
-      {/* Nariz triangulo rosa */}
-      <path d="M 31 39 L 33 39 L 32 41 Z" fill="#ff8aa3" />
+      {/* Olhos amendoados (mais delicados que circulos grandes) */}
+      <ellipse cx="26" cy="33" rx="2.2" ry="3.2" fill="#1a1a22" />
+      <ellipse cx="38" cy="33" rx="2.2" ry="3.2" fill="#1a1a22" />
+      {/* Brilhos primarios (grandes) */}
+      <ellipse cx="26.8" cy="31.5" rx="0.9" ry="1.2" fill="#ffffff" />
+      <ellipse cx="38.8" cy="31.5" rx="0.9" ry="1.2" fill="#ffffff" />
+      {/* Brilhos secundarios (pequenos) */}
+      <circle cx="25" cy="34.5" r="0.4" fill="#ffffff" opacity="0.6" />
+      <circle cx="37" cy="34.5" r="0.4" fill="#ffffff" opacity="0.6" />
 
-      {/* Boca pequena - dois arquinhos */}
-      <path d="M 32 41 Q 30 43, 28 42" stroke="#1a1a1a" strokeWidth="0.8" fill="none" />
-      <path d="M 32 41 Q 34 43, 36 42" stroke="#1a1a1a" strokeWidth="0.8" fill="none" />
+      {/* Nariz triangulo rosa, bem pequeno */}
+      <path d="M 31 39 L 33 39 L 32 40.5 Z" fill="#ff8aa3" />
 
-      {/* Bigodes finos */}
-      <line x1="13" y1="37" x2="18" y2="38" stroke="#888" strokeWidth="0.4" />
-      <line x1="13" y1="40" x2="18" y2="40" stroke="#888" strokeWidth="0.4" />
-      <line x1="46" y1="38" x2="51" y2="37" stroke="#888" strokeWidth="0.4" />
-      <line x1="46" y1="40" x2="51" y2="40" stroke="#888" strokeWidth="0.4" />
+      {/* Boca em "V" delicado (sorriso fechado) */}
+      <path d="M 30 41 L 32 42.5 L 34 41" stroke="#1a1a22" strokeWidth="0.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Patinhas em frente */}
-      <ellipse cx="27" cy="56" rx="4" ry="3" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" />
-      <ellipse cx="37" cy="56" rx="4" ry="3" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" />
+      {/* Patinhas curtas em frente do corpinho */}
+      <ellipse cx="26" cy="52" rx="3.5" ry="2.5" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
+      <ellipse cx="38" cy="52" rx="3.5" ry="2.5" fill="#ffffff" stroke="#d8d8e0" strokeWidth="0.4" />
+      {/* Sombra entre as patinhas pra dar profundidade */}
+      <ellipse cx="32" cy="54" rx="3" ry="0.8" fill="#000" opacity="0.15" />
     </svg>
   );
 }

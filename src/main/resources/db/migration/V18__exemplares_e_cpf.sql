@@ -19,8 +19,12 @@
 -- ============================================================================
 
 -- ---------- 1) Limpa dados antigos ------------------------------------------
-DELETE FROM emprestimos;
+-- Ordem importa: tabelas dependentes (com FK) sao deletadas ANTES das
+-- dependencias. Reservas referencia emprestimos (fk_reservas_emprestimo), entao
+-- reservas vai primeiro. Usuarios referencia alunos (aluno_id), entao usuarios
+-- antes de alunos.
 DELETE FROM reservas;
+DELETE FROM emprestimos;
 DELETE FROM refresh_tokens WHERE usuario_id IN (SELECT id FROM usuarios WHERE role != 'ADMIN');
 DELETE FROM livro_capa;
 DELETE FROM livros;
