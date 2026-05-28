@@ -8,6 +8,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Spin,
   Table,
@@ -16,6 +17,7 @@ import {
   type TableProps,
 } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listarExemplares } from '../api/exemplares';
 import { confirmarReserva, listarReservasPendentes, recusarReserva } from '../api/reservas';
 import { mensagemDeErro } from '../api/http';
 import type { ReservaResponse } from '../types/api';
@@ -37,6 +39,9 @@ export default function ReservasPendentesPage() {
   // Reserva escolhida para confirmar — abre o modal de prazo.
   const [confirmando, setConfirmando] = useState<ReservaResponse | null>(null);
   const [prazoDias, setPrazoDias] = useState<number>(PRAZO_PADRAO);
+  // Exemplar escolhido pelo bibliotecario (pode trocar o reservado por outro
+  // que ele tem na mao). null = usa o reservado.
+  const [exemplarEscolhido, setExemplarEscolhido] = useState<number | null>(null);
   const [page, setPage] = useState(0);
 
   const { data, isLoading } = useQuery({
@@ -61,11 +66,21 @@ export default function ReservasPendentesPage() {
     queryClient.invalidateQueries({ queryKey: ['emprestimos'] });
   }
 
+  // Exemplares disponíveis do livro da reserva sendo confirmada — pra trocar
+  // o reservado por outro que o bibliotecario tem em maos.
+  const { data: exemplaresDoLivro } = useQuery({
+    queryKey: ['exemplares', confirmando?.livro.id],
+    queryFn: () => listarExemplares(confirmando!.livro.id),
+    enabled: confirmando !== null,
+  });
+
   const confirmar = useMutation({
-    mutationFn: ({ id, prazo }: { id: number; prazo: number }) => confirmarReserva(id, prazo),
+    mutationFn: ({ id, prazo, exemplarId }: { id: number; prazo: number; exemplarId?: number }) =>
+      confirmarReserva(id, prazo, exemplarId),
     onSuccess: () => {
       message.success('Reserva confirmada — empréstimo registrado.');
       setConfirmando(null);
+      setExemplarEscolhido(null);
       invalidarTudo();
     },
     onError: (erro) => message.error(mensagemDeErro(erro)),
@@ -115,7 +130,23 @@ export default function ReservasPendentesPage() {
   );
 
   const colunas: TableProps<ReservaResponse>['columns'] = [
-    { title: 'Livro', key: 'livro', render: (_, r) => r.livro.titulo },
+    {
+      title: 'Livro',
+      key: 'livro',
+      render: (_, r) => (
+        <>
+          {r.livro.titulo}
+          {r.livro.exemplarCodigo && (
+            <>
+              <br />
+              <Tag color="gold" style={{ fontFamily: 'monospace', fontSize: 11, marginTop: 4 }}>
+                {r.livro.exemplarCodigo}
+              </Tag>
+            </>
+          )}
+        </>
+      ),
+    },
     {
       title: 'Aluno',
       key: 'aluno',
@@ -155,6 +186,13 @@ export default function ReservasPendentesPage() {
         reservas.map((reserva) => (
           <Card key={reserva.id} size="small" style={{ marginBottom: 12 }}>
             <Typography.Text strong>{reserva.livro.titulo}</Typography.Text>
+            {reserva.livro.exemplarCodigo && (
+              <div style={{ marginTop: 2 }}>
+                <Tag color="gold" style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                  {reserva.livro.exemplarCodigo}
+                </Tag>
+              </div>
+            )}
             <div style={{ marginTop: 4 }}>
               <Typography.Text>{reserva.aluno.nome}</Typography.Text>
               <br />
@@ -195,7 +233,13 @@ export default function ReservasPendentesPage() {
         okText="Confirmar empréstimo"
         cancelText="Cancelar"
         onOk={() => {
-          if (confirmando) confirmar.mutate({ id: confirmando.id, prazo: prazoDias });
+          if (confirmando) {
+            confirmar.mutate({
+              id: confirmando.id,
+              prazo: prazoDias,
+              exemplarId: exemplarEscolhido ?? undefined,
+            });
+          }
         }}
       >
         {confirmando && (
@@ -203,6 +247,30 @@ export default function ReservasPendentesPage() {
             <Typography.Paragraph style={{ marginBottom: 4 }}>
               <Tag color="blue">{confirmando.livro.titulo}</Tag>
             </Typography.Paragraph>
+            <div style={{ marginBottom: 12 }}>
+              <Typography.Text style={{ fontSize: 13 }}>
+                Exemplar a entregar:
+              </Typography.Text>
+              <Select
+                style={{ width: '100%', marginTop: 4 }}
+                value={exemplarEscolhido ?? confirmando.livro.exemplarId ?? undefined}
+                onChange={(v) => setExemplarEscolhido(v)}
+                placeholder="Escolha o exemplar físico"
+                options={(exemplaresDoLivro ?? [])
+                  // Mostra DISPONIVEL + o RESERVADO desta reserva (que e o
+                  // "default"). Outros estados (EMPRESTADO, EXTRAVIADO) ficam fora.
+                  .filter((e) =>
+                    e.situacao === 'DISPONIVEL' || e.id === confirmando.livro.exemplarId
+                  )
+                  .map((e) => ({
+                    value: e.id,
+                    label: `${e.codigo} ${e.id === confirmando.livro.exemplarId ? '(reservado)' : '(disponível)'}`,
+                  }))}
+              />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                ⚠️ O sistema reservou <strong>{confirmando.livro.exemplarCodigo ?? '—'}</strong>, mas você pode entregar outro exemplar físico se preferir.
+              </Typography.Text>
+            </div>
             <Typography.Paragraph type="secondary">
               Aluno: {confirmando.aluno.nome} ({confirmando.aluno.cpf})
             </Typography.Paragraph>

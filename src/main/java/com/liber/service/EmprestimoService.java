@@ -274,6 +274,31 @@ public class EmprestimoService {
         return salvo;
     }
 
+    /**
+     * Remove permanentemente um emprestimo do historico. Só funciona em
+     * emprestimos NAO-ATIVOS (DEVOLVIDO ou CANCELADO) — emprestimo ativo
+     * tem que ser devolvido ou cancelado antes (pra liberar o exemplar).
+     *
+     * <p>Antes do delete, desassocia o emprestimo das reservas que o
+     * referenciam (Reserva.emprestimo_id vira NULL), senao a FK estoura.
+     * As reservas confirmadas continuam no historico — so perdem o link
+     * direto pro registro de emprestimo (que vai sumir).
+     */
+    @Transactional
+    public void removerDoHistorico(Long emprestimoId) {
+        Emprestimo emp = emprestimoRepository.findById(emprestimoId)
+            .orElseThrow(() -> ResourceNotFoundException.of("Emprestimo", emprestimoId));
+        if (emp.getSituacao() == SituacaoEmprestimo.ATIVO) {
+            throw new RegraEmprestimoException(
+                "Nao e possivel remover do historico um emprestimo ATIVO. "
+                + "Registre a devolucao ou cancele antes.");
+        }
+        reservaRepository.desassociarDoEmprestimo(emprestimoId);
+        emprestimoRepository.deleteById(emprestimoId);
+        log.info("Emprestimo id={} ({}) removido permanentemente do historico",
+            emprestimoId, emp.getSituacao());
+    }
+
     private void validarPrazo(int prazoDias) {
         if (prazoDias > props.prazoMaximoDias()) {
             throw new RegraEmprestimoException(

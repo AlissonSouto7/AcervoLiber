@@ -150,17 +150,43 @@ public class ReservaService {
     }
 
     @Transactional
-    public ReservaResponse confirmar(Long reservaId, int prazoDias) {
+    public ReservaResponse confirmar(Long reservaId, int prazoDias, Long exemplarIdEscolhido) {
         Reserva reserva = carregarPendente(reservaId);
-        // O exemplar ja esta separado pela reserva (situacao RESERVADO).
+        Exemplar exemplarReservado = reserva.getExemplar();
+        Exemplar exemplarFinal = exemplarReservado;
+
+        // Bibliotecario pode trocar o exemplar reservado por outro DISPONIVEL
+        // do MESMO livro (ex.: o LIB-00001 reservado nao esta na mao, mas
+        // LIB-00002 esta). Libera o reservado e marca o novo como reservado.
+        if (exemplarIdEscolhido != null && (exemplarReservado == null
+                || !exemplarIdEscolhido.equals(exemplarReservado.getId()))) {
+            Exemplar escolhido = exemplarRepository.findById(exemplarIdEscolhido)
+                .orElseThrow(() -> ResourceNotFoundException.of("Exemplar", exemplarIdEscolhido));
+            if (!escolhido.getLivro().getId().equals(reserva.getLivro().getId())) {
+                throw new BusinessException(
+                    "Exemplar escolhido pertence a outro livro.");
+            }
+            if (escolhido.getSituacao() != SituacaoExemplar.DISPONIVEL) {
+                throw new BusinessException(
+                    "Exemplar " + escolhido.getCodigo() + " nao esta disponivel.");
+            }
+            // Libera o reservado anterior
+            if (exemplarReservado != null && exemplarReservado.getSituacao() == SituacaoExemplar.RESERVADO) {
+                exemplarReservado.setSituacao(SituacaoExemplar.DISPONIVEL);
+                exemplarRepository.save(exemplarReservado);
+            }
+            exemplarFinal = escolhido;
+            reserva.setExemplar(escolhido);
+        }
+
         Emprestimo emprestimo = emprestimoService.registrarParaReserva(
-            reserva.getExemplar(), reserva.getAluno(), prazoDias);
+            exemplarFinal, reserva.getAluno(), prazoDias);
         reserva.setStatus(StatusReserva.CONFIRMADA);
         reserva.setDataResolucao(Instant.now(clock));
         reserva.setEmprestimo(emprestimo);
-        log.info("Reserva confirmada id={} exemplar={} aluno_id={} -> emprestimo id={} prazo={}d",
-            reservaId, reserva.getExemplar().getId(), reserva.getAluno().getId(),
-            emprestimo.getId(), prazoDias);
+        log.info("Reserva confirmada id={} exemplar={} ({}) aluno_id={} -> emprestimo id={} prazo={}d",
+            reservaId, exemplarFinal.getId(), exemplarFinal.getCodigo(),
+            reserva.getAluno().getId(), emprestimo.getId(), prazoDias);
         Reserva salva = reservaRepository.save(reserva);
         return ReservaResponse.from(salva);
     }

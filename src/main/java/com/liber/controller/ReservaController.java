@@ -87,7 +87,7 @@ public class ReservaController {
     @Operation(summary = "Confirma uma reserva — gera o emprestimo")
     public ReservaResponse confirmar(@PathVariable Long id,
                                      @Valid @RequestBody ConfirmarReservaRequest req) {
-        return reservaService.confirmar(id, req.prazoDias());
+        return reservaService.confirmar(id, req.prazoDias(), req.exemplarId());
     }
 
     @PostMapping("/{id}/recusar")

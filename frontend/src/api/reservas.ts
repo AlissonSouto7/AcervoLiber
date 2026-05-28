@@ -29,8 +29,15 @@ export async function listarReservasPendentes(params: { page?: number; size?: nu
   return resp.data;
 }
 
-export async function confirmarReserva(id: number, prazoDias: number): Promise<ReservaResponse> {
-  const resp = await http.post<ReservaResponse>(`/reservas/${id}/confirmar`, { prazoDias });
+export async function confirmarReserva(
+  id: number,
+  prazoDias: number,
+  exemplarId?: number,
+): Promise<ReservaResponse> {
+  const resp = await http.post<ReservaResponse>(`/reservas/${id}/confirmar`, {
+    prazoDias,
+    exemplarId,
+  });
   return resp.data;
 }
 

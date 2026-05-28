@@ -1,7 +1,21 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Grid, List, Space, Table, Tag, Typography, type TableProps } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { listarHistorico } from '../api/emprestimos';
+import { DeleteOutlined } from '@ant-design/icons';
+import {
+  Alert,
+  App,
+  Button,
+  Card,
+  Grid,
+  List,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  type TableProps,
+} from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listarHistorico, removerEmprestimoDoHistorico } from '../api/emprestimos';
 import { mensagemDeErro } from '../api/http';
 import { StatusUrgenciaTag } from '../components/StatusUrgenciaTag';
 import type { EmprestimoResponse } from '../types/api';
@@ -20,12 +34,47 @@ function tagSituacao(emp: EmprestimoResponse) {
 export default function HistoricoPage() {
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['historico', page],
     queryFn: () => listarHistorico({ page, size: TAMANHO_PAGINA }),
   });
+
+  const remover = useMutation({
+    mutationFn: (id: number) => removerEmprestimoDoHistorico(id),
+    onSuccess: () => {
+      message.success('Registro removido do histórico');
+      queryClient.invalidateQueries({ queryKey: ['historico'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (e) => message.error(mensagemDeErro(e)),
+  });
+
+  const botaoRemover = (emp: EmprestimoResponse) => {
+    const podeRemover = emp.situacao !== 'ATIVO';
+    return (
+      <Popconfirm
+        title="Remover este registro do histórico?"
+        description="Esta ação é permanente. O exemplar e os dados do aluno permanecem — só o registro deste empréstimo é apagado."
+        okText="Remover"
+        okButtonProps={{ danger: true }}
+        onConfirm={() => remover.mutate(emp.id)}
+        disabled={!podeRemover}
+      >
+        <Button
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          disabled={!podeRemover}
+          loading={remover.isPending && remover.variables === emp.id}
+          title={podeRemover ? 'Remover do histórico' : 'Empréstimo ativo não pode ser removido'}
+        />
+      </Popconfirm>
+    );
+  };
 
   const colunas: TableProps<EmprestimoResponse>['columns'] = [
     { title: 'Livro', dataIndex: ['livro', 'titulo'] },
@@ -55,6 +104,7 @@ export default function HistoricoPage() {
       width: 180,
       render: (_, e) => <StatusUrgenciaTag status={e.statusUrgencia} />,
     },
+    { title: '', key: 'acoes', width: 70, render: (_, e) => botaoRemover(e) },
   ];
 
   const paginacao = {
@@ -91,24 +141,29 @@ export default function HistoricoPage() {
           pagination={paginacao}
           renderItem={(emp) => (
             <Card size="small" style={{ marginBottom: 12 }}>
-              <Typography.Text strong>{emp.livro.titulo}</Typography.Text>
-              <div>
-                <Typography.Text type="secondary">
-                  {emp.aluno.nome} · Turma {emp.aluno.turma}
-                </Typography.Text>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Typography.Text strong>{emp.livro.titulo}</Typography.Text>
+                  <div>
+                    <Typography.Text type="secondary">
+                      {emp.aluno.nome} · Turma {emp.aluno.turma}
+                    </Typography.Text>
+                  </div>
+                  <div>
+                    <Typography.Text type="secondary">
+                      {formatarData(emp.dataEmprestimo)} → {formatarData(emp.dataDevolucaoPrevista)}
+                      {emp.dataDevolucaoEfetiva
+                        ? ` · devolvido ${formatarData(emp.dataDevolucaoEfetiva)}`
+                        : ''}
+                    </Typography.Text>
+                  </div>
+                  <Space style={{ marginTop: 8 }}>
+                    {tagSituacao(emp)}
+                    <StatusUrgenciaTag status={emp.statusUrgencia} />
+                  </Space>
+                </div>
+                {botaoRemover(emp)}
               </div>
-              <div>
-                <Typography.Text type="secondary">
-                  {formatarData(emp.dataEmprestimo)} → {formatarData(emp.dataDevolucaoPrevista)}
-                  {emp.dataDevolucaoEfetiva
-                    ? ` · devolvido ${formatarData(emp.dataDevolucaoEfetiva)}`
-                    : ''}
-                </Typography.Text>
-              </div>
-              <Space style={{ marginTop: 8 }}>
-                {tagSituacao(emp)}
-                <StatusUrgenciaTag status={emp.statusUrgencia} />
-              </Space>
             </Card>
           )}
         />

@@ -107,4 +107,12 @@ public class EmprestimoController {
         emprestimoService.cancelar(id);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{id}/historico")
+    @PreAuthorize("hasAnyRole('BIBLIOTECARIO','ADMIN')")
+    @Operation(summary = "Remove permanentemente um emprestimo do historico (so se DEVOLVIDO ou CANCELADO)")
+    public ResponseEntity<Void> removerDoHistorico(@PathVariable Long id) {
+        emprestimoService.removerDoHistorico(id);
+        return ResponseEntity.noContent().build();
+    }
 }

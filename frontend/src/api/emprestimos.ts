@@ -1,6 +1,11 @@
 import { http } from './http';
 import type { EmprestimoResponse, Page } from '../types/api';
 
+/** Remove permanentemente um emprestimo do historico (so DEVOLVIDO ou CANCELADO). */
+export async function removerEmprestimoDoHistorico(id: number): Promise<void> {
+  await http.delete(`/emprestimos/${id}/historico`);
+}
+
 /** Dados enviados ao registrar um emprestimo. */
 export interface EmprestimoPayload {
   /** ID do exemplar fisico (copia especifica) — escolhido pelo bibliotecario. */
