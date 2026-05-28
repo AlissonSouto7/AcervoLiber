@@ -26,12 +26,15 @@ public interface ExemplarRepository extends JpaRepository<Exemplar, Long> {
     long countByLivroIdAndSituacao(Long livroId, SituacaoExemplar situacao);
 
     /**
-     * Primeiro exemplar DISPONIVEL de um livro (ordem ascendente do id, FIFO de
-     * cadastro). Usado pra atribuir um exemplar concreto quando a reserva e
-     * confirmada — o bibliotecario pode trocar antes de confirmar se quiser.
+     * Exemplares DISPONIVEL de um livro, ordenados por id (FIFO de cadastro).
+     * O service pega o primeiro com {@code .stream().findFirst()}.
      *
-     * <p>Lock pessimista (FOR UPDATE) pra evitar dois bibliotecarios pegarem o
-     * mesmo exemplar simultaneamente.
+     * <p>Lock pessimista (FOR UPDATE) em todos os DISPONIVEL do livro — evita
+     * que dois bibliotecarios/alunos peguem o mesmo exemplar simultaneamente.
+     * Pra uma escola (poucos exemplares por livro), o overhead e desprezivel.
+     *
+     * <p>Antes era {@code Optional<Exemplar>} sem LIMIT — JPA estourava
+     * {@code NonUniqueResultException} quando o livro tinha 2+ exemplares.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -39,7 +42,7 @@ public interface ExemplarRepository extends JpaRepository<Exemplar, Long> {
         WHERE e.livro.id = :livroId AND e.situacao = com.liber.entity.SituacaoExemplar.DISPONIVEL
         ORDER BY e.id ASC
         """)
-    Optional<Exemplar> findPrimeiroDisponivelForUpdate(@Param("livroId") Long livroId);
+    List<Exemplar> findDisponiveisForUpdate(@Param("livroId") Long livroId);
 
     /**
      * Proximo codigo padrao da sequence {@code exemplar_codigo_seq} criada em

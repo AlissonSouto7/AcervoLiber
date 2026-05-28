@@ -53,7 +53,7 @@ class AdminFlowIT extends AbstractIntegrationTest {
     @Test
     void register_publico_e_bloqueado_com_403_quando_desabilitado() {
         ResponseEntity<ProblemDetail> resp = post("/api/v1/auth/register",
-            new RegisterRequest("qualquer@test.com", "Nome", "senha-12345"),
+            new RegisterRequest("qualquer@test.com", "Nome", "Tr0pical#T1"),
             null, ProblemDetail.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(resp.getBody().getTitle()).isEqualTo("Registro desabilitado");
@@ -62,34 +62,34 @@ class AdminFlowIT extends AbstractIntegrationTest {
     @Test
     void admin_pode_criar_outros_usuarios_e_bibliotecario_nao() {
         // Cria admin diretamente no DB
-        Usuario admin = criarUsuarioDireto("admin-test@test.com", "senha-admin-1", Role.ADMIN);
-        String tokenAdmin = login(admin.getEmail(), "senha-admin-1");
+        Usuario admin = criarUsuarioDireto("admin-test@test.com", "Tr0pical#A1", Role.ADMIN);
+        String tokenAdmin = login(admin.getEmail(), "Tr0pical#A1");
 
         // Admin cria bibliotecario
         ResponseEntity<UsuarioResponse> criou = post("/api/v1/usuarios",
-            new CriarUsuarioRequest("biblio@test.com", "Biblio", "senha-biblio1", Role.BIBLIOTECARIO),
+            new CriarUsuarioRequest("biblio@test.com", "Biblio", "PassStrong1@x", Role.BIBLIOTECARIO),
             tokenAdmin, UsuarioResponse.class);
         assertThat(criou.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(criou.getBody().role()).isEqualTo(Role.BIBLIOTECARIO);
 
         // Bibliotecario nao pode acessar o endpoint admin
-        String tokenBiblio = login("biblio@test.com", "senha-biblio1");
+        String tokenBiblio = login("biblio@test.com", "PassStrong1@x");
         ResponseEntity<ProblemDetail> negado = post("/api/v1/usuarios",
-            new CriarUsuarioRequest("outro@test.com", "Outro", "senha-outro1", Role.BIBLIOTECARIO),
+            new CriarUsuarioRequest("outro@test.com", "Outro", "PassStrong2@x", Role.BIBLIOTECARIO),
             tokenBiblio, ProblemDetail.class);
         assertThat(negado.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
     void desativar_usuario_invalida_token_existente() {
-        Usuario admin = criarUsuarioDireto("admin2@test.com", "senha-admin-2", Role.ADMIN);
-        String tokenAdmin = login(admin.getEmail(), "senha-admin-2");
+        Usuario admin = criarUsuarioDireto("admin2@test.com", "Tr0pical#A2", Role.ADMIN);
+        String tokenAdmin = login(admin.getEmail(), "Tr0pical#A2");
 
         UsuarioResponse vitima = post("/api/v1/usuarios",
-            new CriarUsuarioRequest("vitima@test.com", "Vitima", "senha-vitima1", Role.BIBLIOTECARIO),
+            new CriarUsuarioRequest("vitima@test.com", "Vitima", "PassStrong3@x", Role.BIBLIOTECARIO),
             tokenAdmin, UsuarioResponse.class).getBody();
 
-        String tokenVitima = login(vitima.email(), "senha-vitima1");
+        String tokenVitima = login(vitima.email(), "PassStrong3@x");
         // Token funciona inicialmente
         assertThat(get("/api/v1/auth/me", tokenVitima).getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -109,8 +109,8 @@ class AdminFlowIT extends AbstractIntegrationTest {
 
     @Test
     void jwt_emitido_antes_da_troca_de_senha_e_invalidado() throws Exception {
-        Usuario u = criarUsuarioDireto("rotacao@test.com", "senha-original", Role.BIBLIOTECARIO);
-        String tokenAntigo = login(u.getEmail(), "senha-original");
+        Usuario u = criarUsuarioDireto("rotacao@test.com", "Mang@Forte01", Role.BIBLIOTECARIO);
+        String tokenAntigo = login(u.getEmail(), "Mang@Forte01");
         assertThat(get("/api/v1/auth/me", tokenAntigo).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // Espera 6s para garantir que a tolerancia de 5s da comparacao seja ultrapassada
@@ -120,7 +120,7 @@ class AdminFlowIT extends AbstractIntegrationTest {
         ResponseEntity<Void> trocou = http.post().uri("/api/v1/auth/change-password")
             .contentType(MediaType.APPLICATION_JSON)
             .headers(h -> h.setBearerAuth(tokenAntigo))
-            .body(java.util.Map.of("senhaAtual", "senha-original", "senhaNova", "senha-nova-1"))
+            .body(java.util.Map.of("senhaAtual", "Mang@Forte01", "senhaNova", "Mang@Forte99"))
             .retrieve().toEntity(Void.class);
         assertThat(trocou.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
@@ -128,7 +128,7 @@ class AdminFlowIT extends AbstractIntegrationTest {
         assertThat(get("/api/v1/auth/me", tokenAntigo).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         // Login com senha nova gera token valido
-        String tokenNovo = login(u.getEmail(), "senha-nova-1");
+        String tokenNovo = login(u.getEmail(), "Mang@Forte99");
         assertThat(get("/api/v1/auth/me", tokenNovo).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
@@ -146,8 +146,8 @@ class AdminFlowIT extends AbstractIntegrationTest {
             .retrieve().toEntity(ProblemDetail.class);
         assertThat(sem.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
-        Usuario admin = criarUsuarioDireto("admin-actuator@test.com", "senha-admin-3", Role.ADMIN);
-        String token = login(admin.getEmail(), "senha-admin-3");
+        Usuario admin = criarUsuarioDireto("admin-actuator@test.com", "Tr0pical#A3", Role.ADMIN);
+        String token = login(admin.getEmail(), "Tr0pical#A3");
         ResponseEntity<String> com = http.get().uri("/actuator/metrics")
             .headers(h -> h.setBearerAuth(token))
             .retrieve().toEntity(String.class);

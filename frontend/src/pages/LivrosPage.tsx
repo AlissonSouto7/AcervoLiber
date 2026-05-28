@@ -30,6 +30,7 @@ import {
 import { mensagemDeErro } from '../api/http';
 import { CapaLivro } from '../components/CapaLivro';
 import { CapaPreview } from '../components/CapaPreview';
+import { ExemplaresList } from '../components/ExemplaresList';
 import type { LivroResponse } from '../types/api';
 
 const TAMANHO_PAGINA_PADRAO = 12;
@@ -413,6 +414,11 @@ export default function LivrosPage() {
             </Button>
           </Form>
         )}
+
+        {/* Lista de exemplares — so aparece ao EDITAR (livro ja existe). No
+            cadastro novo, os exemplares iniciais sao criados pelo campo
+            'Exemplares iniciais' do form acima. */}
+        {drawerAberto && editando && <ExemplaresList livroId={editando.id} />}
       </Drawer>
     </>
   );

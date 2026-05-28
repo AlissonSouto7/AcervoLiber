@@ -92,7 +92,8 @@ public class ReservaService {
         // lock pessimista pra evitar race com outra reserva simultanea.
         Livro livro = livroRepository.findById(livroId)
             .orElseThrow(() -> ResourceNotFoundException.of("Livro", livroId));
-        Exemplar exemplar = exemplarRepository.findPrimeiroDisponivelForUpdate(livroId)
+        Exemplar exemplar = exemplarRepository.findDisponiveisForUpdate(livroId)
+            .stream().findFirst()
             .orElseThrow(() -> new EstoqueIndisponivelException(livroId));
         exemplar.setSituacao(SituacaoExemplar.RESERVADO);
         exemplarRepository.save(exemplar);
