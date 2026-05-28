@@ -56,6 +56,7 @@ public class UsuarioService {
         if (usuarioRepository.existsByEmail(email)) {
             throw new BusinessException("Email ja cadastrado: " + email);
         }
+        validarSenhaContraDadosPessoais(senha, nome, email);
 
         Usuario novo = Usuario.builder()
             .email(email)
@@ -133,6 +134,38 @@ public class UsuarioService {
         return UsuarioResponse.from(salvo);
     }
 
+    /**
+     * EXCLUI permanentemente um usuario. Diferente de desativar (que e
+     * reversivel), aqui o registro e apagado. As mesmas protecoes da
+     * desativacao se aplicam: nao pode excluir a si mesmo nem o ultimo
+     * administrador ativo.
+     *
+     * <p>Alunos com historico de emprestimos/reservas NAO devem ser excluidos
+     * por esta rota — o admin deve preservar o registro (use desativar). Esta
+     * rota e principalmente pra desfazer cadastros recentes/incorretos de
+     * bibliotecarios e admins.
+     */
+    @Transactional
+    public void excluir(Long id, String principalEmail) {
+        Usuario u = usuarioRepository.findById(id)
+            .orElseThrow(() -> ResourceNotFoundException.of("Usuario", id));
+
+        if (principalEmail != null && principalEmail.equalsIgnoreCase(u.getEmail())) {
+            throw new BusinessException("Voce nao pode excluir a si mesmo.");
+        }
+        if (u.getRole() == Role.ADMIN
+                && usuarioRepository.countByRoleAndAtivoIsTrueAndIdNot(Role.ADMIN, id) == 0) {
+            throw new BusinessException(
+                "Nao e possivel excluir o ultimo administrador ativo. "
+                + "Crie ou ative outro admin antes.");
+        }
+
+        // Revoga refresh tokens e apaga o usuario
+        refreshTokenService.revogarTodosDoUsuario(id);
+        usuarioRepository.deleteById(id);
+        log.info("Usuario id={} email={} EXCLUIDO permanentemente", id, u.getEmail());
+    }
+
     @Transactional
     public void alterarSenha(String email, String senhaAtual, String senhaNova) {
         Usuario usuario = usuarioRepository.findByEmail(email)
@@ -145,6 +178,7 @@ public class UsuarioService {
         if (passwordEncoder.matches(senhaNova, usuario.getSenhaHash())) {
             throw new BusinessException("A nova senha deve ser diferente da atual");
         }
+        validarSenhaContraDadosPessoais(senhaNova, usuario.getNome(), usuario.getEmail());
 
         usuario.setSenhaHash(passwordEncoder.encode(senhaNova));
         usuario.setPasswordChangedAt(Instant.now());
@@ -155,5 +189,40 @@ public class UsuarioService {
         // pedido para logar de novo no proximo refresh — esperado.
         refreshTokenService.revogarTodosDoUsuario(usuario.getId());
         log.info("Senha alterada para usuario id={} email={}", usuario.getId(), usuario.getEmail());
+    }
+
+    /**
+     * Bloqueia senhas que contem nome ou email do usuario (case-insensitive,
+     * sem acentos). Um atacante que sabe o email/nome consegue chutar senha
+     * trivial — esse check fecha o caso obvio.
+     */
+    private static void validarSenhaContraDadosPessoais(String senha, String nome, String email) {
+        if (senha == null) return;
+        String s = normalizar(senha);
+        if (nome != null) {
+            String n = normalizar(nome);
+            if (!n.isEmpty() && s.contains(n)) {
+                throw new BusinessException("A senha nao pode conter o seu nome.");
+            }
+            // Tambem bloqueia partes do nome com 4+ caracteres (Alisson -> alisson)
+            for (String parte : n.split("\\s+")) {
+                if (parte.length() >= 4 && s.contains(parte)) {
+                    throw new BusinessException("A senha nao pode conter partes do seu nome.");
+                }
+            }
+        }
+        if (email != null) {
+            String localPart = email.split("@")[0];
+            String e = normalizar(localPart);
+            if (e.length() >= 4 && s.contains(e)) {
+                throw new BusinessException("A senha nao pode conter o seu email.");
+            }
+        }
+    }
+
+    private static String normalizar(String s) {
+        return java.text.Normalizer.normalize(s.trim(), java.text.Normalizer.Form.NFD)
+            .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+            .toLowerCase();
     }
 }

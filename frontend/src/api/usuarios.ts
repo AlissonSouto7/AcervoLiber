@@ -23,3 +23,8 @@ export async function alterarStatusUsuario(id: number, ativo: boolean): Promise<
   const resp = await http.patch<Usuario>(`/usuarios/${id}/status`, { ativo });
   return resp.data;
 }
+
+/** Exclui permanentemente um usuario (admin nao pode excluir a si mesmo). */
+export async function excluirUsuario(id: number): Promise<void> {
+  await http.delete(`/usuarios/${id}`);
+}

@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,5 +58,13 @@ public class UsuarioController {
                                           @PathVariable Long id,
                                           @Valid @RequestBody AtualizarStatusUsuarioRequest req) {
         return usuarioService.alterarStatus(id, req.ativo(), principal.getUsername());
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Exclui um usuario permanentemente (admin nao pode excluir a si mesmo)")
+    public ResponseEntity<Void> excluir(@AuthenticationPrincipal UserDetails principal,
+                                        @PathVariable Long id) {
+        usuarioService.excluir(id, principal.getUsername());
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

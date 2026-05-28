@@ -123,7 +123,7 @@ export default function LoginPage() {
           { required: true, message: 'Informe uma senha' },
           { min: 10, message: 'Mínimo 10 caracteres' },
         ]}
-        tooltip="Mínimo 10 caracteres."
+        tooltip="Mínimo 10 caracteres com letra MAIÚSCULA, minúscula, número e símbolo (ex.: @ # $). Não pode conter seu nome."
       >
         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
       </Form.Item>

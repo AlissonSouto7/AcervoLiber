@@ -140,6 +140,9 @@ public class AlunoService {
             throw new BusinessException("Voce ja tem cadastro. Faca login normalmente.");
         }
 
+        // Bloqueia senha contendo o proprio nome ou CPF do aluno
+        validarSenhaAluno(req.senha(), aluno.getNome(), cpf);
+
         String email = "aluno." + cpf + "@liber.local";
         Usuario usuario = Usuario.builder()
             .email(email)
@@ -230,6 +233,25 @@ public class AlunoService {
         log.info("Acesso de aluno criado para cpf={} email={}",
             Cpf.mask(aluno.getCpf()), salvo.getEmail());
         return UsuarioResponse.from(salvo);
+    }
+
+    /** Bloqueia senha que contem nome ou CPF do proprio aluno. */
+    private static void validarSenhaAluno(String senha, String nome, String cpf) {
+        if (senha == null) return;
+        String s = java.text.Normalizer.normalize(senha.trim(), java.text.Normalizer.Form.NFD)
+            .replaceAll("\\p{InCombiningDiacriticalMarks}+", "").toLowerCase();
+        if (nome != null) {
+            String n = java.text.Normalizer.normalize(nome.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "").toLowerCase();
+            for (String parte : n.split("\\s+")) {
+                if (parte.length() >= 4 && s.contains(parte)) {
+                    throw new BusinessException("A senha nao pode conter partes do seu nome.");
+                }
+            }
+        }
+        if (cpf != null && cpf.length() >= 6 && s.contains(cpf)) {
+            throw new BusinessException("A senha nao pode conter o seu CPF.");
+        }
     }
 
     Aluno carregar(Long id) {

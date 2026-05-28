@@ -57,40 +57,12 @@ function Numidia() {
           strokeLinejoin="round"
         />
 
-        {/* ============ BRACINHOS ABERTOS PROS LADOS (estilo "ola") ============ */}
-        {/* Brace esquerdo: traco grosso curvo do peito ate fora da cintura */}
-        <path
-          d="M 32 56 Q 25 60, 22 67"
-          stroke="#ffffff"
-          strokeWidth="6"
-          fill="none"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 32 56 Q 25 60, 22 67"
-          stroke="#dadae2"
-          strokeWidth="0.5"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Brace direito (simetrico) */}
-        <path
-          d="M 48 56 Q 55 60, 58 67"
-          stroke="#ffffff"
-          strokeWidth="6"
-          fill="none"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 48 56 Q 55 60, 58 67"
-          stroke="#dadae2"
-          strokeWidth="0.5"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Maozinhas redondas na ponta dos bracos */}
-        <circle cx="22" cy="67" r="3.2" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
-        <circle cx="58" cy="67" r="3.2" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
+        {/* ============ BRACINHOS ABERTOS PROS LADOS, LEVEMENTE SUBIDOS ============ */}
+        {/* Sem stroke escuro (era risco no meio do braco). Pontas mais altas. */}
+        <path d="M 32 54 Q 26 56, 22 62" stroke="#ffffff" strokeWidth="6" fill="none" strokeLinecap="round" />
+        <path d="M 48 54 Q 54 56, 58 62" stroke="#ffffff" strokeWidth="6" fill="none" strokeLinecap="round" />
+        <circle cx="22" cy="62" r="3.2" fill="#ffffff" />
+        <circle cx="58" cy="62" r="3.2" fill="#ffffff" />
 
         {/* ============ CABEÇA (a parte que voce aprovou) ============ */}
         {/* Orelhas brancas arredondadas com interior rosa */}

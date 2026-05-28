@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   App,
   Button,
@@ -11,6 +11,7 @@ import {
   List,
   Popconfirm,
   Select,
+  Space,
   Switch,
   Table,
   Tag,
@@ -21,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   alterarStatusUsuario,
   criarUsuario,
+  excluirUsuario,
   listarUsuarios,
   type CriarUsuarioPayload,
 } from '../api/usuarios';
@@ -68,6 +70,39 @@ export default function UsuariosPage() {
     onError: (erro) => message.error(mensagemDeErro(erro)),
   });
 
+  const excluir = useMutation({
+    mutationFn: (id: number) => excluirUsuario(id),
+    onSuccess: () => {
+      message.success('Usuário excluído permanentemente');
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+    },
+    onError: (erro) => message.error(mensagemDeErro(erro)),
+  });
+
+  const botaoExcluir = (u: Usuario) => {
+    const ehSelf = u.id === usuarioLogado?.id;
+    return (
+      <Popconfirm
+        title={`Excluir ${u.nome} PERMANENTEMENTE?`}
+        description="Esta ação não pode ser desfeita. Considere apenas DESATIVAR se houver histórico no sistema."
+        okText="Excluir permanentemente"
+        okButtonProps={{ danger: true }}
+        cancelText="Cancelar"
+        onConfirm={() => excluir.mutate(u.id)}
+        disabled={ehSelf}
+      >
+        <Button
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          disabled={ehSelf}
+          loading={excluir.isPending && excluir.variables === u.id}
+          title={ehSelf ? 'Você não pode se excluir' : 'Excluir permanentemente'}
+        />
+      </Popconfirm>
+    );
+  };
+
   const switchStatus = (u: Usuario) => {
     const ehSelf = u.id === usuarioLogado?.id;
     const sw = (
@@ -105,6 +140,7 @@ export default function UsuariosPage() {
     { title: 'E-mail', dataIndex: 'email' },
     { title: 'Perfil', dataIndex: 'role', width: 150, render: (r: Role) => tagRole(r) },
     { title: 'Ativo', key: 'ativo', width: 90, render: (_, u) => switchStatus(u) },
+    { title: 'Ações', key: 'acoes', width: 90, render: (_, u) => botaoExcluir(u) },
   ];
 
   const paginacao = {
@@ -150,7 +186,10 @@ export default function UsuariosPage() {
                   </div>
                   <div style={{ marginTop: 8 }}>{tagRole(u.role)}</div>
                 </div>
-                {switchStatus(u)}
+                <Space direction="vertical" size={4} align="end">
+                  {switchStatus(u)}
+                  {botaoExcluir(u)}
+                </Space>
               </div>
             </Card>
           )}
@@ -199,6 +238,7 @@ export default function UsuariosPage() {
             <Form.Item
               name="senha"
               label="Senha"
+              tooltip="Mínimo 10 caracteres com letra MAIÚSCULA, minúscula, número e símbolo (ex.: @ # $). Não pode conter o nome ou e-mail do usuário."
               rules={[
                 { required: true, message: 'Informe a senha' },
                 { min: 10, message: 'A senha deve ter ao menos 10 caracteres' },

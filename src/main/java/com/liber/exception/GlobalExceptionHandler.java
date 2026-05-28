@@ -59,8 +59,14 @@ public class GlobalExceptionHandler {
                 "mensagem", fe.getDefaultMessage() == null ? "invalido" : fe.getDefaultMessage()))
             .collect(Collectors.toList());
 
-        ProblemDetail pd = build(HttpStatus.BAD_REQUEST, "Dados invalidos",
-            "Um ou mais campos da requisicao sao invalidos.", req);
+        // Detail agora carrega a primeira mensagem especifica do validator (ex.:
+        // "Senha deve conter ao menos uma letra MAIUSCULA.") em vez do generico
+        // "Um ou mais campos...". O frontend mostra esse detail direto no toast.
+        String detail = erros.isEmpty()
+            ? "Um ou mais campos da requisicao sao invalidos."
+            : erros.get(0).get("mensagem");
+
+        ProblemDetail pd = build(HttpStatus.BAD_REQUEST, "Dados invalidos", detail, req);
         pd.setProperty("erros", erros);
         return pd;
     }
