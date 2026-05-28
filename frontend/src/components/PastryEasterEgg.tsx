@@ -21,8 +21,9 @@ export function PastryEasterEgg() {
 }
 
 /**
- * Numidia — gatinha branca com corpinho completo dentro de avatar circular.
- * Refinada a partir de referencia visual fornecida pelo usuario.
+ * Numidia — gatinha branca com coroa, busto fundido no fundo do avatar e
+ * bracinhos estendidos pros lados (estilo "ola"). Refinada com base em
+ * referencias visuais fornecidas pelo usuario.
  */
 function Numidia() {
   return (
@@ -40,21 +41,58 @@ function Numidia() {
       {/* Avatar circulo escuro de fundo */}
       <circle cx="40" cy="40" r="38" fill="url(#bgNumidia)" />
 
-      {/* Todo o personagem fica clipado dentro do circulo */}
       <g clipPath="url(#clipCirculo)">
-        {/* ============ CORPO + PERNINHAS ============ */}
-        {/* Corpo principal (peito branco) — em pe */}
-        <ellipse cx="40" cy="58" rx="14" ry="14" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
+        {/* ============ BARRIGUINHA (sem pernas, some no fundo do circulo) ============ */}
+        {/* Tronco em forma de sino: estreito perto do pescoco, alarga e desce ate o
+            limite do circulo. O clipPath corta automaticamente o que passa. */}
+        <path
+          d="M 32 50
+             Q 30 55, 30 62
+             Q 30 78, 40 80
+             Q 50 78, 50 62
+             Q 50 55, 48 50 Z"
+          fill="#ffffff"
+          stroke="#dadae2"
+          strokeWidth="0.5"
+          strokeLinejoin="round"
+        />
 
-        {/* Perninhas pequenas embaixo do corpo */}
-        <ellipse cx="34" cy="73" rx="4" ry="3.5" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
-        <ellipse cx="46" cy="73" rx="4" ry="3.5" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
+        {/* ============ BRACINHOS ABERTOS PROS LADOS (estilo "ola") ============ */}
+        {/* Brace esquerdo: traco grosso curvo do peito ate fora da cintura */}
+        <path
+          d="M 32 56 Q 25 60, 22 67"
+          stroke="#ffffff"
+          strokeWidth="6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 32 56 Q 25 60, 22 67"
+          stroke="#dadae2"
+          strokeWidth="0.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {/* Brace direito (simetrico) */}
+        <path
+          d="M 48 56 Q 55 60, 58 67"
+          stroke="#ffffff"
+          strokeWidth="6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 48 56 Q 55 60, 58 67"
+          stroke="#dadae2"
+          strokeWidth="0.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {/* Maozinhas redondas na ponta dos bracos */}
+        <circle cx="22" cy="67" r="3.2" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
+        <circle cx="58" cy="67" r="3.2" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
 
-        {/* Bracinhos do lado do corpo */}
-        <ellipse cx="27" cy="58" rx="3.5" ry="6" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
-        <ellipse cx="53" cy="58" rx="3.5" ry="6" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
-
-        {/* ============ CABEÇA ============ */}
+        {/* ============ CABEÇA (a parte que voce aprovou) ============ */}
         {/* Orelhas brancas arredondadas com interior rosa */}
         <path d="M 24 26 Q 23 15, 29 14 Q 33 18, 33 26 Z" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" strokeLinejoin="round" />
         <path d="M 26 23 Q 26 19, 30 19 Q 31 21, 31 24 Z" fill="#fad5dd" />
@@ -71,7 +109,7 @@ function Numidia() {
         />
         <circle cx="40" cy="13.2" r="0.9" fill="#ff7b9d" />
 
-        {/* Cabeça branca redonda — dominante */}
+        {/* Cabeça branca redonda dominante */}
         <circle cx="40" cy="34" r="17" fill="#ffffff" stroke="#dadae2" strokeWidth="0.5" />
 
         {/* Bochechas rosadas pequenas */}
@@ -81,10 +119,8 @@ function Numidia() {
         {/* Olhos grandes redondos pretos com brilho */}
         <ellipse cx="33" cy="34" rx="2.8" ry="3.3" fill="#1a1a22" />
         <ellipse cx="47" cy="34" rx="2.8" ry="3.3" fill="#1a1a22" />
-        {/* Brilho grande topo */}
         <ellipse cx="34" cy="32.5" rx="1.1" ry="1.4" fill="#ffffff" />
         <ellipse cx="48" cy="32.5" rx="1.1" ry="1.4" fill="#ffffff" />
-        {/* Brilho pequeno baixo */}
         <circle cx="32" cy="35.5" r="0.5" fill="#ffffff" opacity="0.7" />
         <circle cx="46" cy="35.5" r="0.5" fill="#ffffff" opacity="0.7" />
 
