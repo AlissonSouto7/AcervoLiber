@@ -2,7 +2,7 @@
 
 **Sistema de gestão da biblioteca escolar**
 
-Versão 1.0 — para bibliotecários(as), administradores e professores
+Versão 1.1 — para bibliotecários(as), administradores e professores
 
 ---
 
@@ -130,7 +130,7 @@ Clique em **+ Novo livro** no topo direito. Preencha:
 
 Clique em **Salvar** e pronto.
 
-#### Exemplares — o que mudou
+#### Exemplares — cada cópia tem identidade própria
 
 Antes, o sistema só guardava "tenho 5 cópias de Dom Casmurro". Agora cada cópia tem **identidade própria**: você sabe que o exemplar `LIB-00042` está com o aluno Felipe, e o `LIB-00043` está na prateleira.
 
@@ -138,8 +138,6 @@ Por que isso importa:
 - Se o aluno perder um livro, você sabe exatamente qual cópia ficou faltando do acervo.
 - Você pode marcar um exemplar específico como **extraviado** sem afetar os outros.
 - Permite alinhar com a **etiqueta de tombamento** que a escola já cola nos livros — basta renomear o código padrão (`LIB-00042`) pra etiqueta real (`2024-A-042`, ou o que a escola usa).
-
-> Os botões pra renomear, extraviar e adicionar exemplares avulsos chegarão numa atualização rápida — por enquanto, o sistema cria os exemplares no cadastro inicial com códigos sequenciais (LIB-XXXXX).
 
 ### 5.4 Sobre a capa do livro
 
@@ -155,14 +153,29 @@ A sinopse aparece quando o aluno clica em "Ver detalhes" no catálogo. O sistema
 
 Se preferir o resumo do Google Books mas o que veio não te agrada, basta apagar o campo e salvar — o sistema vai tentar de novo no próximo ciclo.
 
-### 5.6 Editar ou remover um livro
+### 5.6 Gerenciar exemplares (renomear, extraviar, adicionar)
 
-- **Editar**: clique no ícone de lápis no card do livro. Mude o que precisar e salve.
+Quando você **edita um livro** (ícone de lápis), aparece no final do formulário uma seção **"Exemplares (N)"** com a lista de todas as cópias físicas daquele livro.
+
+Cada linha mostra:
+- **Código** do exemplar (ex: `LIB-00042`) — em fonte monoespaçada
+- **Situação** (tag colorida): 🟢 Disponível, 🔵 Emprestado, 🟡 Reservado, 🔴 Extraviado
+- **Botões de ação** (que aparecem dependendo da situação)
+
+#### Ações disponíveis
+
+| Ação | Quando aparece | O que faz |
+|---|---|---|
+| ✏️ **Renomear código** | Sempre | Troca `LIB-00042` por algo como `2024-A-042` (a etiqueta real da escola). Útil pra alinhar com o sistema de tombamento que a biblioteca já usa. |
+| ⚠️ **Marcar extraviado** | Só Disponível | Marca o exemplar como perdido. Fica vermelho na lista, ainda visível no histórico mas **não pode ser emprestado**. |
+| ♻️ **Reativar** | Só Extraviado | O livro apareceu de novo? Reativa pra DISPONÍVEL. |
+| 🗑️ **Remover** | Só Disponível | Apaga permanentemente do acervo. Só funciona se nunca foi emprestado. Pra livro com histórico, prefira "marcar extraviado" pra preservar o registro. |
+| ➕ **Adicionar** (botão no topo) | Sempre | Cria mais um exemplar avulso. Recebe o próximo código auto (`LIB-XXXXX`); você pode renomear depois. |
+
+### 5.7 Editar ou remover um livro
+
+- **Editar**: clique no ícone de lápis no card do livro. Mude o que precisar e salve. (Aproveite o drawer aberto pra gerenciar os exemplares — seção 5.6.)
 - **Remover**: clique no ícone de lixeira. O sistema **não permite remover** livros que têm empréstimos no histórico (pra preservar o registro de quem pegou o quê). Também não remove se houver reservas pendentes.
-
-### 5.7 Atenção: reduzir exemplares
-
-Se você diminuir a **Quantidade** de exemplares de um livro, o sistema **não deixa** baixar abaixo do que está em uso (empréstimos ativos + reservas pendentes). Exemplo: se há 3 alunos com o livro emprestado e 1 reserva, o mínimo permitido é 4. Isso evita estoque negativo.
 
 ---
 
@@ -211,7 +224,13 @@ Se o aluno reclamar que o nome está errado (acento faltando, sobrenome incomple
 
 ### 6.6 Remover um aluno
 
-Mesmo regra dos livros: alunos com empréstimos no histórico não podem ser removidos. Se precisar "desligar" um aluno, peça ao administrador para **desativar** a conta de usuário dele (seção 12).
+Clique no ícone de lixeira na linha do aluno. O sistema só bloqueia se ele tem:
+- **Empréstimo ATIVO** (livro ainda com ele) → registre a devolução antes
+- **Reserva PENDENTE** (segurando um exemplar) → cancele antes
+
+Se ele só tem histórico (livros devolvidos, reservas resolvidas), **a remoção apaga em cascata**: o registro do aluno, o histórico de empréstimos dele, as reservas resolvidas e a conta de acesso ao sistema. Os **exemplares físicos não são afetados** — só o registro de quem pegou some.
+
+⚠️ **Atenção:** estatísticas do Dashboard (ranking de livros mais emprestados, etc.) perdem esses lançamentos. Use só quando o aluno realmente saiu da escola — pra "afastamento temporário", prefira desativar a conta de acesso (mantém o histórico).
 
 ---
 
@@ -295,12 +314,15 @@ Reservas acontecem quando o **aluno** quer um livro que **está disponível** e 
 
 ### 8.2 Confirmar uma reserva (aluno retirou)
 
-Menu lateral → **Reservas**. Clique em **Confirmar** ao lado da reserva.
+Menu lateral → **Reservas**. Cada linha mostra o **código do exemplar** que o sistema separou (ex: `LIB-00042`). Clique em **Confirmar** ao lado da reserva.
 
-- Defina o **prazo de devolução** (padrão 7 dias)
-- Clique em **Confirmar e gerar empréstimo**
+O modal mostra:
+- **Livro** reservado
+- **Exemplar a entregar**: select com o exemplar reservado em destaque (default), mais outros DISPONÍVEIS do mesmo livro. **Pode trocar** se você tem outra cópia em mãos.
+- **Aluno** (nome + CPF mascarado)
+- **Prazo de devolução** (padrão 7 dias)
 
-Pronto — o aluno está com o livro registrado normalmente.
+Confira o código de tombamento no livro físico antes de entregar, escolha o exemplar correto no select, ajuste o prazo se preciso e clique em **Confirmar empréstimo**.
 
 ### 8.3 Recusar uma reserva
 
@@ -329,6 +351,12 @@ Filtros disponíveis:
 - Conferir se um aluno realmente devolveu um livro semanas atrás
 - Auditar empréstimos antes do recesso escolar
 - Gerar relatórios manuais (no momento sem exportação PDF/CSV — em desenvolvimento)
+
+### 9.1 Remover um registro do histórico
+
+Cada linha tem um 🗑️ vermelho no fim. **Empréstimos ATIVOS** têm o botão desabilitado (devolva ou cancele antes). **Devolvidos e Cancelados** podem ser removidos permanentemente.
+
+Use com critério — esses registros somem das estatísticas do Dashboard. Bom pra limpar lançamentos errados ou de teste, **não** pra apagar empréstimos reais.
 
 ---
 
@@ -379,8 +407,19 @@ Menu lateral inferior → **Configurações**.
 
 Você precisa informar:
 - **Senha atual**
-- **Nova senha** (mínimo 10 caracteres, diferente da atual)
+- **Nova senha** (regras abaixo, diferente da atual)
 - **Confirmar nova senha**
+
+**Regras da nova senha:**
+- Mínimo **10 caracteres**
+- Ao menos **1 letra MAIÚSCULA**
+- Ao menos **1 letra minúscula**
+- Ao menos **1 número**
+- Ao menos **1 caractere especial** (ex: `@ # $ % & * !`)
+- **Não pode conter o seu nome ou e-mail** (mesmo em pedaços de 4+ letras)
+- Não pode ser uma senha "comum" (ex: `password1`, `qwerty12345`)
+
+**Exemplos válidos:** `Biblioteca@2026`, `Numidia#Forte1`, `Acervo!Liber9`
 
 Após salvar, **todas as suas sessões são encerradas** e você precisa entrar de novo com a nova senha.
 
@@ -394,9 +433,9 @@ Esta seção só aparece pra usuários do tipo **Administrador**. Menu lateral �
 
 Clique em **+ Novo usuário**. Preencha e-mail, nome, senha provisória e o tipo (ADMIN ou BIBLIOTECÁRIO). Você não pode criar contas tipo ALUNO por aqui — alunos têm um caminho próprio (seção 6.3).
 
-### 12.2 Desativar um usuário
+### 12.2 Desativar um usuário (reversível)
 
-Clique no usuário → **Desativar**. Efeito imediato:
+Clique no **switch** ao lado do usuário → confirme a desativação. Efeito imediato:
 
 - Todas as sessões dele são encerradas
 - Ele não consegue mais entrar
@@ -408,7 +447,22 @@ Clique no usuário → **Desativar**. Efeito imediato:
 
 ### 12.3 Reativar
 
-Clique em **Ativar** no usuário desativado. Ele volta a entrar normalmente (com a última senha que ele tinha).
+Clique no switch de novo. Ele volta a entrar normalmente (com a última senha que ele tinha).
+
+### 12.4 Excluir permanentemente (irreversível)
+
+Diferente de desativar, **excluir apaga o usuário do banco**. Clique no botão 🗑️ vermelho na linha do usuário → confirmação enfática → confirmar.
+
+**Quando usar excluir vs desativar:**
+
+| Cenário | Recomendação |
+|---|---|
+| Funcionário saiu definitivamente da escola | Excluir |
+| Cadastrou usuário errado / teste | Excluir |
+| Funcionário em licença, vai voltar | Desativar |
+| Funcionário com histórico relevante | Desativar (preserva quem aprovou o quê) |
+
+**Proteções automáticas:** mesmas da desativação — você não pode se excluir nem deixar o sistema sem nenhum administrador.
 
 ---
 
@@ -481,4 +535,4 @@ A tela **Dashboard** mostra todos os atrasados. Você pode anotar nome/turma e c
 
 Em caso de dúvidas técnicas (problemas no servidor, erros que se repetem, sugestões de melhoria), entre em contato com o responsável técnico do projeto.
 
-*Versão deste manual: 1.0*
+*Versão deste manual: 1.1 — atualizado com exemplares, gerenciamento, exclusão e política de senha forte.*
