@@ -87,25 +87,55 @@ public class AlunoService {
         return AlunoResponse.from(salvo, contarEmprestimosAtivos(id));
     }
 
+    /**
+     * Remove um aluno e TUDO ligado a ele (cascade manual): emprestimos do
+     * historico, reservas resolvidas e usuario do portal.
+     *
+     * <p>Bloqueia se houver:
+     * <ul>
+     *   <li>empr ATIVO — livro ainda esta com o aluno, precisa devolver primeiro</li>
+     *   <li>reserva PENDENTE — segura exemplar, precisa cancelar primeiro</li>
+     * </ul>
+     *
+     * <p>Caso contrario: apaga tudo. O exemplar fisico NAO e afetado (so o
+     * registro do emprestimo desaparece). Estatisticas do dashboard perdem
+     * esses lancamentos — esperado, e o aluno saiu da escola.
+     */
     @Transactional
     public void remover(Long id) {
         if (!alunoRepository.existsById(id)) {
             throw ResourceNotFoundException.of("Aluno", id);
         }
-        if (emprestimoRepository.existsByAlunoId(id)) {
+        long ativos = emprestimoRepository.countByAlunoIdAndSituacao(id, SituacaoEmprestimo.ATIVO);
+        if (ativos > 0) {
             throw new BusinessException(
-                "Nao e possivel remover aluno com historico de emprestimos. Mantenha-o para preservar o historico.");
+                "Aluno tem " + ativos + " livro(s) emprestado(s) no momento. "
+                + "Registre as devolucoes antes de remover.");
         }
-        if (reservaRepository.existsByAlunoId(id)) {
+        long pendentes = reservaRepository.countByAlunoIdAndStatus(
+            id, com.liber.entity.StatusReserva.PENDENTE);
+        if (pendentes > 0) {
             throw new BusinessException(
-                "Aluno possui reservas no historico. Cancele as pendentes antes de remover.");
+                "Aluno tem " + pendentes + " reserva(s) pendente(s). "
+                + "Cancele-as antes de remover.");
         }
-        if (usuarioRepository.existsByAlunoId(id)) {
-            throw new BusinessException(
-                "Aluno possui acesso ao sistema (login do portal). Remova o acesso antes.");
-        }
+
+        // Cascade manual — ordem importa por causa das FKs:
+        // 1. Reservas (referencia emprestimos.id em alguns casos; deleta primeiro)
+        // 2. Emprestimos (so DEVOLVIDO/CANCELADO chegaram aqui)
+        // 3. Usuario do portal + refresh tokens dele
+        // 4. Aluno
+        int reservasDeletadas = reservaRepository.deleteAllByAlunoId(id);
+        int emprestimosDeletados = emprestimoRepository.deleteAllByAlunoId(id);
+        usuarioRepository.findByAlunoId(id).ifPresent(u -> {
+            // RefreshTokens tem FK pra usuarios; precisa revogar+limpar antes
+            // (mas revogar so seta status; pra deletar de fato usaria outra query).
+            // Pra simplicidade aqui, deixamos o cascade do FK (ON DELETE CASCADE em V4).
+            usuarioRepository.deleteById(u.getId());
+        });
         alunoRepository.deleteById(id);
-        log.info("Aluno removido id={}", id);
+        log.info("Aluno id={} removido (cascade: emprestimos={}, reservas={})",
+            id, emprestimosDeletados, reservasDeletadas);
     }
 
     /**

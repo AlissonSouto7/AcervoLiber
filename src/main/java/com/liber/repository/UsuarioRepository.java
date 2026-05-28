@@ -27,4 +27,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     /** Resolve o usuario de um aluno pelo CPF — usado no login do aluno. */
     Optional<Usuario> findByAlunoCpf(String cpf);
+
+    /** Usuario vinculado a um aluno (so 1, por causa da unique constraint em usuarios.aluno_id). */
+    Optional<Usuario> findByAlunoId(Long alunoId);
 }

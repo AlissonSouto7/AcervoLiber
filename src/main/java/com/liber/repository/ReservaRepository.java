@@ -49,4 +49,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     @Modifying
     @Query("UPDATE Reserva r SET r.emprestimo = null WHERE r.emprestimo.id = :emprestimoId")
     int desassociarDoEmprestimo(@Param("emprestimoId") Long emprestimoId);
+
+    /** Apaga todas as reservas de um aluno — usado no cascade de remover aluno. */
+    @Modifying
+    @Query("DELETE FROM Reserva r WHERE r.aluno.id = :alunoId")
+    int deleteAllByAlunoId(@Param("alunoId") Long alunoId);
 }

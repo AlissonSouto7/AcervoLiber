@@ -20,6 +20,11 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
 
     long countByAlunoIdAndSituacao(Long alunoId, SituacaoEmprestimo situacao);
 
+    /** Apaga todos os emprestimos de um aluno — usado no cascade de remover aluno. */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Emprestimo e WHERE e.aluno.id = :alunoId")
+    int deleteAllByAlunoId(@org.springframework.data.repository.query.Param("alunoId") Long alunoId);
+
     boolean existsByExemplarId(Long exemplarId);
 
     /** Indica se ha qualquer emprestimo (ativo ou historico) com algum exemplar do livro. */
